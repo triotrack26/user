@@ -84,6 +84,7 @@
             z-index: 2;
             border: 3px solid #fff;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
         }
         .timeline-time { font-size: 0.8rem; font-weight: bold; color: var(--primary-color); }
         .timeline-name { font-size: 0.75rem; white-space: normal; line-height: 1.2; margin-top: 5px; }
@@ -91,19 +92,20 @@
         /* Moving Bus Icon */
         .timeline-bus-icon {
             position: absolute;
-            top: 15px; /* Sits above the line */
+            top: 5px; /* Sits above the line */
             left: 50%;
             transform: translateX(-50%);
             color: #dc3545; /* Red color for visibility */
-            font-size: 1.2rem;
+            font-size: 1.5rem;
             z-index: 10;
-            animation: bounce 1s infinite alternate;
             display: none; /* Hidden by default, shown via JS */
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3));
+            transition: left 0.5s ease;
         }
-        .timeline-stop.active .timeline-bus-icon { display: block; }
-        .timeline-stop.active .timeline-dot { background-color: #dc3545; transform: scale(1.2); }
+        .timeline-stop.active .timeline-bus-icon { display: block; animation: bounce 1s infinite alternate; }
+        .timeline-stop.active .timeline-dot { background-color: #dc3545; transform: scale(1.3); border-color: #ffcccc; }
         
-        @keyframes bounce { from { top: 15px; } to { top: 10px; } }
+        @keyframes bounce { from { top: 5px; } to { top: 0px; } }
 
         /* Dark Mode Overrides */
         [data-bs-theme="dark"] .bg-light { background-color: #121212 !important; }
@@ -532,7 +534,7 @@
         });
     });
 
-    // 5. TRACKING LOGIC (Updated for Linear Line & Bus Name)
+    // 5. TRACKING LOGIC (Updated to Sync Linear Tracker with Map Updates)
     function track(busNum) {
         const mapDiv = document.getElementById('map-container');
         mapDiv.style.display = 'block';
@@ -543,30 +545,53 @@
         
         document.getElementById('map-title').innerHTML = `<i class="fas fa-satellite-dish me-2"></i>Tracking: ${busName} (${busNum})`;
         
-        // Render Linear Timeline
+        // Initial Render of Empty Timeline
         const timelineDiv = document.getElementById('route-timeline');
-        
-        if(busDetails && busDetails.route) {
-            let timelineHTML = "";
+        timelineDiv.innerHTML = `<div class="text-center p-3">Waiting for signal...</div>`;
+
+        // SCROLL TO MAP
+        setTimeout(() => {
+            mapDiv.scrollIntoView({ behavior: 'smooth' });
+            if (!map) {
+                map = L.map('map').setView([10.0, 76.0], 10);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+            }
+            map.invalidateSize();
+        }, 100);
+
+        if (unsubscribe) unsubscribe();
+        if (marker) map.removeLayer(marker);
+
+        // Define Update Function for Timeline
+        const updateTimeline = (lat, lng) => {
+            if(!busDetails || !busDetails.route) return;
+
+            // Note: Since we don't have GPS coordinates for stops in the DB, 
+            // we use Time-based progress relative to Current Time as the best proxy 
+            // for the "Nearest Stop" visual on the linear tracker.
+            // This is re-calculated every time the map location updates (onSnapshot).
+            
             const now = new Date();
             const currentHours = now.getHours();
             const currentMinutes = now.getMinutes();
             const currentTimeVal = currentHours * 60 + currentMinutes;
 
-            // Find likely current stop index based on time (Logic: Just passed this stop)
             let activeIndex = -1;
             
             busDetails.route.forEach((stop, index) => {
                 if(stop.time) {
                     const [h, m] = stop.time.split(':').map(Number);
                     const stopTimeVal = h * 60 + m;
+                    // If current time is past stop time, this is the last passed stop
                     if(currentTimeVal >= stopTimeVal) activeIndex = index;
                 }
             });
 
-            // If early morning and not started, position at start. If finished, position at end.
-            if(activeIndex === -1) activeIndex = 0; 
+            // Boundary checks
+            if(activeIndex === -1) activeIndex = 0; // Haven't started
+            if(activeIndex >= busDetails.route.length) activeIndex = busDetails.route.length - 1; // Finished
 
+            let timelineHTML = "";
             busDetails.route.forEach((stop, index) => {
                 const isActive = index === activeIndex ? "active" : "";
                 
@@ -581,38 +606,30 @@
             });
             timelineDiv.innerHTML = `<div style="white-space: nowrap; min-width: 100%; text-align: left;">${timelineHTML}</div>`;
             
-            // Auto-scroll to active stop
+            // Auto-scroll logic
             setTimeout(() => {
                 const activeEl = timelineDiv.querySelector('.active');
                 if(activeEl) activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center' });
             }, 500);
-        }
+        };
 
-        setTimeout(() => {
-            mapDiv.scrollIntoView({ behavior: 'smooth' });
-            if (!map) {
-                map = L.map('map').setView([10.0, 76.0], 10);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-            }
-            map.invalidateSize();
-        }, 100);
-
-        if (unsubscribe) unsubscribe();
-        if (marker) map.removeLayer(marker);
-
+        // Listen for Location Updates
         unsubscribe = onSnapshot(doc(db, "locations", busNum), (docSnapshot) => {
             if (docSnapshot.exists()) {
                 const { lat, lng } = docSnapshot.data();
                 
-                // Popup now shows Bus Name and Number
+                // 1. Update Map Marker
                 const popupContent = `<div class="text-center"><b>${busName}</b><br><span class="badge bg-secondary">${busNum}</span></div>`;
-                
                 if (marker) {
                     marker.setLatLng([lat, lng]).setPopupContent(popupContent);
                 } else { 
                     marker = L.marker([lat, lng]).addTo(map).bindPopup(popupContent).openPopup();
                 }
                 map.setView([lat, lng], 15);
+
+                // 2. Update Linear Tracker (Syncing with Map Data Stream)
+                updateTimeline(lat, lng);
+
             } else { 
                 alert("GPS Signal Lost: This bus is offline.");
             }
