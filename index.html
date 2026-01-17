@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <title>TrioTrack - Find, Route, Track</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&family=Roboto:wght@300;400;500&display=swap');
+
+        :root {
+            --primary-color: #0d6efd;
+            --secondary-color: #6c757d;
+            --accent-color: #0dcaf0;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        h1, h2, h3, h4, h5 {
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* SPA Sections */
+        .spa-section { display: none; animation: fadeIn 0.4s ease-in-out; }
+        .spa-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Welcome Screen */
+        .hero-title { font-weight: 800; letter-spacing: -1px; }
+        .tagline { letter-spacing: 3px; font-weight: 300; color: var(--secondary-color); font-size: 0.9rem; }
+        .feature-card { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border: none; }
+        .feature-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        
+        /* Map & Cards */
+        #map-container { display: none; height: 550px; margin-top: 20px; border-radius: 15px; border: 2px solid var(--primary-color); position: relative; z-index: 10; background: #fff; }
+        #map { height: 65%; width: 100%; border-radius: 12px 12px 0 0; }
+        .bus-card { border: none; border-left: 5px solid var(--primary-color); background: var(--bs-body-bg); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .bus-card:hover { transform: scale(1.01); }
+
+        /* Linear Timeline Styles */
+        #route-timeline {
+            height: 35%;
+            padding: 15px;
+            overflow-x: auto;
+            white-space: nowrap;
+            background-color: #f8f9fa;
+            border-radius: 0 0 12px 12px;
+            border-top: 1px solid #ddd;
+        }
+        .timeline-stop {
+            display: inline-block;
+            text-align: center;
+            position: relative;
+            min-width: 100px;
+            vertical-align: top;
+        }
+        .timeline-stop::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background-color: #ddd;
+            z-index: 1;
+        }
+        .timeline-stop:first-child::before { left: 50%; width: 50%; }
+        .timeline-stop:last-child::before { width: 50%; }
+        
+        .timeline-dot {
+            width: 20px;
+            height: 20px;
+            background-color: var(--primary-color);
+            border-radius: 50%;
+            margin: 5px auto 10px;
+            position: relative;
+            z-index: 2;
+            border: 3px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .timeline-time { font-size: 0.8rem; font-weight: bold; color: var(--primary-color); }
+        .timeline-name { font-size: 0.75rem; white-space: normal; line-height: 1.2; margin-top: 5px; }
+
+        /* Dark Mode Overrides */
+        [data-bs-theme="dark"] .bg-light { background-color: #121212 !important; }
+        [data-bs-theme="dark"] .card { background-color: #1e1e1e; border-color: #333; }
+        [data-bs-theme="dark"] #route-timeline { background-color: #2c2c2c; border-top: 1px solid #444; }
+        [data-bs-theme="dark"] .timeline-stop::before { background-color: #555; }
+        [data-bs-theme="dark"] .timeline-dot { border-color: #2c2c2c; }
+    </style>
+</head>
+<body class="bg-light">
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg sticky-top shadow-sm" style="background-color: var(--bs-body-bg);">
+    <div class="container">
+        <a class="navbar-brand d-flex flex-column" href="#" onclick="showSection('welcome-section')">
+            <span class="hero-title text-primary"><i class="fas fa-bus-alt me-2"></i>TRIOTRACK</span>
+            <span class="tagline">FIND • ROUTE • TRACK</span>
+        </a>
+        
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+            <div class="d-flex align-items-center gap-3 flex-column flex-lg-row mt-3 mt-lg-0">
+                <div class="text-end lh-1 d-none d-lg-block">
+                    <div id="clock-time" class="fw-bold">00:00</div>
+                    <div id="clock-date" class="small text-muted">Loading...</div>
+                </div>
+                <!-- Admin Button in Navbar -->
+                <a href="admin.html" class="btn btn-outline-danger btn-sm rounded-pill px-3">
+                    <i class="fas fa-user-shield me-1"></i> Admin
+                </a>
+                <button class="btn btn-outline-secondary rounded-circle btn-sm" id="themeToggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-4">
+
+    <!-- 1. WELCOME SECTION -->
+    <div id="welcome-section" class="spa-section active">
+        <div class="row align-items-center mb-5">
+            <div class="col-lg-6">
+                <h1 class="display-4 fw-bold mb-3">Your Journey,<br><span class="text-primary">Simplified.</span></h1>
+                <p class="lead text-muted mb-4">
+                    TrioTrack is a route-finding and bus-tracking platform designed to support multiple transport sections. 
+                    It covers private local route connections, KSRTC buses under the Government of Kerala, 
+                    interstate bus connections between major cities in India, and institutional college bus routes. 
+                    The platform focuses only on finding routes and tracking buses in real time.
+                </p>
+                <button onclick="showSection('category-section')" class="btn btn-primary btn-lg rounded-pill px-5 shadow">
+                    Get Started <i class="fas fa-arrow-right ms-2"></i>
+                </button>
+            </div>
+            <div class="col-lg-6 text-center mt-4 mt-lg-0">
+                <img src="https://cdn-icons-png.flaticon.com/512/2083/2083232.png" alt="Bus Fleet" class="img-fluid" style="max-width: 350px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. CATEGORY SELECTION -->
+    <div id="category-section" class="spa-section">
+        <button class="btn btn-link text-decoration-none mb-3" onclick="showSection('welcome-section')"><i class="fas fa-arrow-left"></i> Back</button>
+        <h3 class="fw-bold mb-4 text-center">Select Transport Type</h3>
+        
+        <div class="row g-4 justify-content-center">
+            <!-- Private -->
+            <div class="col-md-5 col-lg-3">
+                <div class="card h-100 feature-card p-3 text-center" onclick="openSearch('Private Bus')">
+                    <div class="card-body">
+                        <div class="bg-warning bg-opacity-10 text-warning rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <i class="fas fa-bus fa-2x"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">Private Bus</h5>
+                        <p class="card-text small text-muted">Local & District Connections</p>
+                    </div>
+                </div>
+            </div>
+            <!-- KSRTC -->
+            <div class="col-md-5 col-lg-3">
+                <div class="card h-100 feature-card p-3 text-center" onclick="openSearch('Public Bus (KSRTC)')">
+                    <div class="card-body">
+                        <div class="bg-success bg-opacity-10 text-success rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <i class="fas fa-landmark fa-2x"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">KSRTC</h5>
+                        <p class="card-text small text-muted">Public Transport Kerala</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Interstate -->
+            <div class="col-md-5 col-lg-3">
+                <div class="card h-100 feature-card p-3 text-center" onclick="openSearch('Interstate')">
+                    <div class="card-body">
+                        <div class="bg-danger bg-opacity-10 text-danger rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <i class="fas fa-road fa-2x"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">Interstate</h5>
+                        <p class="card-text small text-muted">Long Haul Connections</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Institution -->
+            <div class="col-md-5 col-lg-3">
+                <div class="card h-100 feature-card p-3 text-center" onclick="showSection('institution-section')">
+                    <div class="card-body">
+                        <div class="bg-info bg-opacity-10 text-info rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <i class="fas fa-university fa-2x"></i>
+                        </div>
+                        <h5 class="card-title fw-bold">Institution</h5>
+                        <p class="card-text small text-muted">College & School Fleets</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. SEARCH SECTION -->
+    <div id="search-section" class="spa-section">
+        <button class="btn btn-link text-decoration-none mb-3" onclick="showSection('category-section')"><i class="fas fa-arrow-left"></i> Back to Categories</button>
+        
+        <div class="card shadow-sm border-0 p-4 mb-4">
+            <h5 class="mb-3" id="search-title">Find Bus</h5>
+            <input type="hidden" id="categoryFilter">
+
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <label class="small text-muted mb-1">From</label>
+                    <input type="text" id="source" class="form-control" placeholder="Start Location" list="stopOptions">
+                </div>
+                
+                <div class="col-md-1 text-center">
+                    <button class="btn btn-outline-secondary rounded-circle" id="swapBtn" title="Swap Locations">
+                        <i class="fas fa-exchange-alt"></i>
+                    </button>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="small text-muted mb-1">To</label>
+                    <input type="text" id="destination" class="form-control" placeholder="End Location" list="stopOptions">
+                </div>
+                
+                <div class="col-md-2">
+                    <button id="searchBtn" class="btn btn-primary w-100"><i class="fas fa-search me-1"></i> Search</button>
+                </div>
+            </div>
+            <datalist id="stopOptions"></datalist>
+        </div>
+
+        <div id="map-container">
+            <div class="d-flex justify-content-between p-3 bg-white border-bottom rounded-top">
+                <h6 class="text-success fw-bold m-0" id="map-title"><i class="fas fa-satellite-dish me-2"></i>Live Tracking</h6>
+                <button id="closeMapBtn" class="btn btn-sm btn-close"></button>
+            </div>
+            <div id="map"></div>
+            <!-- Linear Route Visualization -->
+            <div id="route-timeline">
+                <div class="text-center text-muted small p-3">Select a bus to view live route timeline.</div>
+            </div>
+        </div>
+
+        <div id="results" class="mt-4"></div>
+    </div>
+
+    <!-- 4. INSTITUTION SECTION -->
+    <div id="institution-section" class="spa-section">
+        <button class="btn btn-link text-decoration-none mb-3" onclick="showSection('category-section')"><i class="fas fa-arrow-left"></i> Back</button>
+        
+        <div class="card p-4 border-0 shadow-sm">
+            <h4 class="mb-4 text-info"><i class="fas fa-graduation-cap me-2"></i>Institutional Transport</h4>
+            
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label">Select District (Kerala)</label>
+                    <select class="form-select" id="districtSelect">
+                        <option value="">-- Select District --</option>
+                        <option value="tvm">Thiruvananthapuram</option>
+                        <option value="klm">Kollam</option>
+                        <option value="pta">Pathanamthitta</option>
+                        <option value="alp">Alappuzha</option>
+                        <option value="ktm">Kottayam</option>
+                        <option value="idk">Idukki</option>
+                        <option value="ekm">Ernakulam</option>
+                        <option value="tsr">Thrissur</option>
+                        <option value="pkd">Palakkad</option>
+                        <option value="mlp">Malappuram</option>
+                        <option value="clt">Kozhikode</option>
+                        <option value="wnd">Wayanad</option>
+                        <option value="knr">Kannur</option>
+                        <option value="ksd">Kasaragod</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Select Government Polytechnic</label>
+                    <select class="form-select" id="collegeSelect" disabled>
+                        <option>Select District First</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="institution-results" style="display:none;">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> Viewing routes for: <strong id="selected-college-name"></strong>
+                </div>
+                <h5 class="mt-4">College Bus Schedule</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 30%">Route Path</th>
+                                <th style="width: 50%">Stops</th>
+                                <th style="width: 20%">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inst-table-body">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // 1. FIREBASE CONFIG
+    const firebaseConfig = {
+      apiKey: "AIzaSyDcWwo0m2eS1ndyC06U1G_JF1J7Y1WNlfQ",
+      authDomain: "triotrack-66dd6.firebaseapp.com",
+      projectId: "triotrack-66dd6",
+      storageBucket: "triotrack-66dd6.firebasestorage.app",
+      messagingSenderId: "994389952848",
+      appId: "1:994389952848:web:659fbc330f2d660dfb0455",
+      measurementId: "G-B7TMFX0F21"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let map = null;
+    let marker = null;
+    let unsubscribe = null;
+    let allRoutesData = [];
+
+    // Helper: Convert Time to AM/PM
+    window.formatTime = (timeStr) => {
+        if(!timeStr || timeStr === "N/A") return "";
+        const [hours, minutes] = timeStr.split(':');
+        const h = parseInt(hours);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        return `${h12}:${minutes} ${ampm}`;
+    };
+
+    // 2. UI HELPERS
+    window.showSection = (id) => {
+        document.querySelectorAll('.spa-section').forEach(el => el.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        window.scrollTo(0,0);
+    };
+
+    window.openSearch = (category) => {
+        document.getElementById('categoryFilter').value = category;
+        document.getElementById('search-title').innerHTML = `Find ${category}`;
+        showSection('search-section');
+    };
+
+    // Dark Mode Logic
+    const themeToggle = document.getElementById('themeToggle');
+    themeToggle.addEventListener('click', () => {
+        const html = document.documentElement;
+        const icon = themeToggle.querySelector('i');
+        if (html.getAttribute('data-bs-theme') === 'light') {
+            html.setAttribute('data-bs-theme', 'dark');
+            icon.classList.replace('fa-moon', 'fa-sun');
+        } else {
+            html.setAttribute('data-bs-theme', 'light');
+            icon.classList.replace('fa-sun', 'fa-moon');
+        }
+    });
+
+    // Clock
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById('clock-time').innerText = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        document.getElementById('clock-date').innerText = now.toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'});
+    }, 1000);
+
+    // Swap Button
+    document.getElementById('swapBtn').addEventListener('click', () => {
+        const src = document.getElementById('source');
+        const dst = document.getElementById('destination');
+        const temp = src.value;
+        src.value = dst.value;
+        dst.value = temp;
+    });
+
+    // 3. LOGIC (Fetching Data)
+    async function loadStops() {
+        try {
+            const snapshot = await getDocs(collection(db, "routes"));
+            const stopsSet = new Set();
+            
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                allRoutesData.push(data);
+                if (data.route && Array.isArray(data.route)) {
+                    data.route.forEach(stop => {
+                        if (stop.name) stopsSet.add(stop.name.trim());
+                    });
+                }
+            });
+
+            const dataList = document.getElementById('stopOptions');
+            stopsSet.forEach(stopName => {
+                const option = document.createElement('option');
+                option.value = stopName;
+                dataList.appendChild(option);
+            });
+        } catch (error) { console.error("Error loading stops:", error); }
+    }
+    loadStops();
+
+    // 4. SEARCH FUNCTION
+    document.getElementById('searchBtn').addEventListener('click', () => {
+        const src = document.getElementById('source').value.toLowerCase().trim();
+        const dst = document.getElementById('destination').value.toLowerCase().trim();
+        const categoryFilter = document.getElementById('categoryFilter').value;
+        const resDiv = document.getElementById('results');
+        
+        if (!src || !dst) return alert("Please enter both Source and Destination");
+        
+        resDiv.innerHTML = "<div class='text-center mt-3'><div class='spinner-border text-primary'></div><p>Searching...</p></div>";
+
+        let html = "";
+        let count = 0;
+
+        allRoutesData.forEach(d => {
+            if (categoryFilter !== "All" && d.category !== categoryFilter) return;
+
+            const keywords = d.searchKeywords || [];
+            const sIdx = keywords.indexOf(src);
+            const dIdx = keywords.indexOf(dst);
+
+            if (sIdx !== -1 && dIdx !== -1 && sIdx < dIdx) {
+                count++;
+                const t1Obj = d.route.find(r => r.name.toLowerCase() === src);
+                const t2Obj = d.route.find(r => r.name.toLowerCase() === dst);
+                const t1Display = formatTime(t1Obj.time);
+                const t2Display = formatTime(t2Obj.time);
+
+                const shareText = `Ride Details: ${d.busName} (${d.busNumber}). From ${t1Obj.name} (${t1Display}) to ${t2Obj.name} (${t2Display}). via TrioTrack.`;
+
+                html += `
+                    <div class="card mb-3 bus-card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="fw-bold text-primary m-0">${d.busName}</h5>
+                                <span class="badge bg-dark">${d.busNumber}</span>
+                            </div>
+                            <div class="d-flex justify-content-between text-center my-3">
+                                <div><small class="text-muted d-block">Departure</small><strong class="fs-5">${t1Display}</strong></div>
+                                <div class="align-self-center text-muted"><i class="fas fa-arrow-right"></i></div>
+                                <div><small class="text-muted d-block">Arrival</small><strong class="fs-5">${t2Display}</strong></div>
+                            </div>
+                            <div class="d-flex gap-2 mt-3">
+                                <button class="btn btn-outline-success btn-sm flex-fill track-btn" data-bus="${d.busNumber}">
+                                    <i class="fas fa-map-marker-alt me-1"></i> Live Track
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm flex-fill share-btn" data-text="${shareText}">
+                                    <i class="fas fa-share-alt me-1"></i> Share
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+        });
+
+        resDiv.innerHTML = count > 0 ? html : "<div class='alert alert-warning text-center'>No buses found.</div>";
+
+        document.querySelectorAll('.track-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => track(e.target.closest('button').getAttribute('data-bus')));
+        });
+        document.querySelectorAll('.share-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const text = e.target.closest('button').getAttribute('data-text');
+                if(navigator.share) navigator.share({ title: 'Bus Details', text: text });
+                else { navigator.clipboard.writeText(text); alert("Details copied to clipboard!"); }
+            });
+        });
+    });
+
+    // 5. TRACKING LOGIC (Updated for Linear Line & Bus Name)
+    function track(busNum) {
+        const mapDiv = document.getElementById('map-container');
+        mapDiv.style.display = 'block';
+        
+        // Find Bus Details
+        const busDetails = allRoutesData.find(b => b.busNumber === busNum);
+        const busName = busDetails ? busDetails.busName : "Unknown Bus";
+        
+        document.getElementById('map-title').innerHTML = `<i class="fas fa-satellite-dish me-2"></i>Tracking: ${busName} (${busNum})`;
+        
+        // Render Linear Timeline
+        const timelineDiv = document.getElementById('route-timeline');
+        if(busDetails && busDetails.route) {
+            let timelineHTML = "";
+            busDetails.route.forEach(stop => {
+                timelineHTML += `
+                    <div class="timeline-stop">
+                        <div class="timeline-time">${formatTime(stop.time)}</div>
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-name">${stop.name}</div>
+                    </div>
+                `;
+            });
+            timelineDiv.innerHTML = `<div style="white-space: nowrap; min-width: 100%; text-align: left;">${timelineHTML}</div>`;
+        }
+
+        setTimeout(() => {
+            mapDiv.scrollIntoView({ behavior: 'smooth' });
+            if (!map) {
+                map = L.map('map').setView([10.0, 76.0], 10);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+            }
+            map.invalidateSize();
+        }, 100);
+
+        if (unsubscribe) unsubscribe();
+        if (marker) map.removeLayer(marker);
+
+        unsubscribe = onSnapshot(doc(db, "locations", busNum), (docSnapshot) => {
+            if (docSnapshot.exists()) {
+                const { lat, lng } = docSnapshot.data();
+                
+                // Popup now shows Bus Name and Number
+                const popupContent = `<div class="text-center"><b>${busName}</b><br><span class="badge bg-secondary">${busNum}</span></div>`;
+                
+                if (marker) {
+                    marker.setLatLng([lat, lng]).setPopupContent(popupContent);
+                } else { 
+                    marker = L.marker([lat, lng]).addTo(map).bindPopup(popupContent).openPopup();
+                }
+                map.setView([lat, lng], 15);
+            } else { 
+                alert("GPS Signal Lost: This bus is offline.");
+            }
+        });
+    }
+
+    document.getElementById('closeMapBtn').addEventListener('click', () => {
+        document.getElementById('map-container').style.display = 'none';
+        if (unsubscribe) unsubscribe();
+    });
+
+    // 6. INSTITUTION DATA & LOGIC (Specific Routes per College)
+    const colleges = {
+        'tvm': ['Govt Polytechnic Nedumangad', 'Central Polytechnic TVM', 'Govt Women\'s Polytechnic Kaimanam', 'Govt Polytechnic Attingal'],
+        'klm': ['Govt Polytechnic Punalur', 'Govt Polytechnic Ezhukone', 'R. Sankar Memorial Polytechnic'],
+        'pta': ['Govt Polytechnic Adoor', 'Govt Polytechnic Vechoochira'],
+        'alp': ['Govt Polytechnic Cherthala', 'Carmel Polytechnic'],
+        'ktm': ['Govt Polytechnic Kottayam', 'Govt Polytechnic Pala', 'Govt Polytechnic Kaduthuruthy'],
+        'idk': ['Govt Polytechnic Muttom', 'Govt Polytechnic Kumily', 'Govt Polytechnic Purapuzha'],
+        'ekm': ['Govt Polytechnic Kalamassery', 'Govt Polytechnic Kothamangalam', 'Govt Polytechnic Perumbavoor'],
+        'tsr': ['Maharaja\'s Technological Institute', 'Govt Polytechnic Chelakkara', 'Govt Polytechnic Kunnamkulam', 'Govt Polytechnic Koratty'],
+        'pkd': ['Govt Polytechnic Palakkad', 'Govt Polytechnic Shoranur', 'IPT & GPTC Shoranur'],
+        'mlp': ['Govt Polytechnic Perinthalmanna', 'Govt Polytechnic Tirurangadi', 'Govt Polytechnic Manjeri', 'Govt Polytechnic Kottakkal'],
+        'clt': ['Govt Polytechnic Kozhikode', 'Kerala Govt Polytechnic', 'Govt Women\'s Polytechnic Kozhikode'],
+        'wnd': ['Govt Polytechnic Meenangadi', 'Govt Polytechnic Mananthavady'],
+        'knr': ['Govt Polytechnic Kannur', 'Govt Polytechnic Payyannur', 'Govt Polytechnic Mattannur'],
+        'ksd': ['Govt Polytechnic Kasaragod', 'Govt Polytechnic Trikaripur']
+    };
+
+    // Specific Database for College Routes
+    const collegeRouteDB = {
+        "Govt Polytechnic Chelakkara": [
+            { path: "Thrissur -> College (Morning)", stops: "Thrissur, Athani, Wadakkanchery, Ootupara, Vazhakode, College", time: "07:45 AM" },
+            { path: "College -> Thrissur (Return)", stops: "College, Vazhakode, Ootupara, Wadakkanchery, Athani, Thrissur", time: "04:10 PM" },
+        ],
+        "Govt Polytechnic Kalamassery": [
+            { path: "Vytilla Hub -> College (Morning)", stops: "Vytilla, Palarivattom, Edappally, Toll Jn, College", time: "08:20 AM" },
+            { path: "College -> Vytilla Hub (Return)", stops: "College, Toll Jn, Edappally, Palarivattom, Vytilla", time: "04:10 PM" },
+        ],
+        "Govt Polytechnic Nedumangad": [
+            { path: "Thampanoor -> College (Morning)", stops: "Thampanoor, Peroorkada, Karakulam, College", time: "08:10 AM" },
+            { path: "College -> Thampanoor (Return)", stops: "College, Karakulam, Peroorkada, Thampanoor", time: "04:15 PM" },
+        ],
+        "Govt Polytechnic Kozhikode": [
+            { path: "Palayam -> College (Morning)", stops: "Palayam, Nadakkavu, West Hill, College", time: "08:30 AM" },
+            { path: "College -> Palayam (Return)", stops: "College, West Hill, Nadakkavu, Palayam", time: "04:10 PM" },
+        ]
+    };
+
+    const districtNames = {
+        'tvm': 'Trivandrum', 'klm': 'Kollam', 'pta': 'Pathanamthitta', 'alp': 'Alappuzha', 
+        'ktm': 'Kottayam', 'idk': 'Idukki', 'ekm': 'Ernakulam', 'tsr': 'Thrissur', 
+        'pkd': 'Palakkad', 'mlp': 'Malappuram', 'clt': 'Kozhikode', 'wnd': 'Wayanad', 
+        'knr': 'Kannur', 'ksd': 'Kasaragod'
+    };
+
+    function getCollegeRoutes(collegeName) {
+        if (collegeRouteDB[collegeName]) {
+            return collegeRouteDB[collegeName];
+        }
+        const districtCode = document.getElementById('districtSelect').value;
+        const mainCity = districtNames[districtCode] || "City Center";
+
+        return [
+            { path: `${mainCity} Bus Stand -> College`, stops: `${mainCity}, Bypass Jn, Civil Station, College`, time: "08:20 AM" },
+            { path: `College -> ${mainCity} Bus Stand`, stops: `College, Civil Station, Bypass Jn, ${mainCity}`, time: "04:10 PM" },
+        ];
+    }
+
+    document.getElementById('districtSelect').addEventListener('change', function() {
+        const dist = this.value;
+        const colSelect = document.getElementById('collegeSelect');
+        colSelect.innerHTML = '<option>Select Government Polytechnic</option>';
+        
+        if(dist && colleges[dist]) {
+            colleges[dist].forEach(c => {
+                const opt = document.createElement('option');
+                opt.text = c;
+                colSelect.add(opt);
+            });
+            colSelect.disabled = false;
+        } else {
+            colSelect.disabled = true;
+        }
+    });
+
+    document.getElementById('collegeSelect').addEventListener('change', function() {
+        if(this.selectedIndex > 0) {
+            const collegeName = this.options[this.selectedIndex].text;
+            document.getElementById('institution-results').style.display = 'block';
+            document.getElementById('selected-college-name').innerText = collegeName;
+            
+            const routes = getCollegeRoutes(collegeName);
+            const tbody = document.getElementById('inst-table-body');
+            tbody.innerHTML = "";
+            
+            routes.forEach(r => {
+                const isReturn = r.path.includes("Return") || r.time.includes("PM");
+                const pathClass = isReturn ? "text-danger" : "text-success";
+                const icon = isReturn ? '<i class="fas fa-undo-alt me-1"></i>' : '<i class="fas fa-bus me-1"></i>';
+
+                const row = `
+                    <tr>
+                        <td class="${pathClass} fw-bold">${icon} ${r.path}</td>
+                        <td class="small text-muted">${r.stops}</td>
+                        <td class="fw-bold">${r.time}</td>
+                    </tr>
+                `;
+                tbody.insertAdjacentHTML('beforeend', row);
+            });
+        }
+    });
+
+</script>
+</body>
+</html>
