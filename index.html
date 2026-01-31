@@ -107,6 +107,15 @@
         
         @keyframes bounce { from { top: 5px; } to { top: 0px; } }
 
+        /* Recent Searches */
+        .recent-search-item {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .recent-search-item:hover {
+            background-color: rgba(13, 110, 253, 0.1) !important;
+        }
+
         /* Dark Mode Overrides */
         [data-bs-theme="dark"] .bg-light { background-color: #121212 !important; }
         [data-bs-theme="dark"] .card { background-color: #1e1e1e; border-color: #333; }
@@ -132,7 +141,7 @@
         <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
             <div class="d-flex align-items-center gap-3 flex-column flex-lg-row mt-3 mt-lg-0">
                 <div class="text-end lh-1 d-none d-lg-block">
-                    <div id="clock-time" class="fw-bold">00:00</div>
+                    <div id="clock-time" class="fw-bold">00:00:00</div>
                     <div id="clock-date" class="small text-muted">Loading...</div>
                 </div>
                 <!-- Admin Button in Navbar -->
@@ -149,19 +158,25 @@
 
 <div class="container py-4">
 
-    <!-- 1. WELCOME SECTION -->
+    <!-- 1. WELCOME / ABOUT SECTION -->
     <div id="welcome-section" class="spa-section active">
         <div class="row align-items-center mb-5">
             <div class="col-lg-6">
-                <h1 class="display-4 fw-bold mb-3">Your Journey,<br><span class="text-primary">Simplified.</span></h1>
+                <h1 class="display-4 fw-bold mb-3"><span class="text-primary">About</span> TrioTrack</h1>
                 <p class="lead text-muted mb-4">
-                    TrioTrack is a route-finding and bus-tracking platform designed to support multiple transport sections. 
-                    It covers private local route connections, KSRTC buses under the Government of Kerala, 
-                    interstate bus connections between major cities in India, and institutional college bus routes. 
-                    The platform focuses only on finding routes and tracking buses in real time.
+                    TrioTrack is a comprehensive route-finding and real-time bus-tracking platform.
                 </p>
+                <div class="bg-body-secondary p-4 rounded-4 mb-4">
+                    <h5 class="fw-bold"><i class="fas fa-info-circle me-2"></i>Our Services</h5>
+                    <p class="mb-0 text-muted">
+                        We support multiple transport sections including private local connections, 
+                        KSRTC buses (Government of Kerala), interstate connections across India, 
+                        and institutional college fleets. Our focus is strictly on precision route 
+                        finding and live telemetry tracking.
+                    </p>
+                </div>
                 <button onclick="showSection('category-section')" class="btn btn-primary btn-lg rounded-pill px-5 shadow">
-                    Get Started <i class="fas fa-arrow-right ms-2"></i>
+                    Find A Bus <i class="fas fa-arrow-right ms-2"></i>
                 </button>
             </div>
             <div class="col-lg-6 text-center mt-4 mt-lg-0">
@@ -257,6 +272,12 @@
                 </div>
             </div>
             <datalist id="stopOptions"></datalist>
+
+            <!-- Recent Searches Section -->
+            <div id="recent-searches-container" class="mt-3" style="display:none;">
+                <label class="small text-muted fw-bold mb-2"><i class="fas fa-history me-1"></i> Recent Searches</label>
+                <div id="recent-searches-list" class="d-flex flex-wrap gap-2"></div>
+            </div>
         </div>
 
         <div id="map-container">
@@ -397,6 +418,7 @@
         document.querySelectorAll('.spa-section').forEach(el => el.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         window.scrollTo(0,0);
+        if(id === 'search-section') loadRecentSearches();
     };
 
     window.openSearch = (category) => {
@@ -419,10 +441,10 @@
         }
     });
 
-    // Clock
+    // Clock with Seconds
     setInterval(() => {
         const now = new Date();
-        document.getElementById('clock-time').innerText = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        document.getElementById('clock-time').innerText = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
         document.getElementById('clock-date').innerText = now.toLocaleDateString(undefined, {weekday: 'long', month: 'short', day: 'numeric'});
     }, 1000);
 
@@ -434,6 +456,40 @@
         src.value = dst.value;
         dst.value = temp;
     });
+
+    // Recent Searches Logic
+    function loadRecentSearches() {
+        const history = JSON.parse(localStorage.getItem('trio_recent')) || [];
+        const container = document.getElementById('recent-searches-container');
+        const list = document.getElementById('recent-searches-list');
+        list.innerHTML = "";
+
+        if (history.length > 0) {
+            container.style.display = 'block';
+            history.forEach(item => {
+                const btn = document.createElement('div');
+                btn.className = 'badge bg-light text-dark border p-2 recent-search-item';
+                btn.innerHTML = `<i class="fas fa-history text-muted me-1"></i> ${item.src} <i class="fas fa-arrow-right mx-1 text-primary"></i> ${item.dst}`;
+                btn.onclick = () => {
+                    document.getElementById('source').value = item.src;
+                    document.getElementById('destination').value = item.dst;
+                };
+                list.appendChild(btn);
+            });
+        }
+    }
+
+    function saveRecentSearch(src, dst) {
+        let history = JSON.parse(localStorage.getItem('trio_recent')) || [];
+        // Remove duplicate if exists
+        history = history.filter(h => !(h.src === src && h.dst === dst));
+        // Add to front
+        history.unshift({ src, dst });
+        // Limit to 3
+        if (history.length > 3) history.pop();
+        localStorage.setItem('trio_recent', JSON.stringify(history));
+        loadRecentSearches();
+    }
 
     // 3. LOGIC (Fetching Data)
     async function loadStops() {
@@ -470,6 +526,9 @@
         
         if (!src || !dst) return alert("Please enter both Source and Destination");
         
+        // Save Search
+        saveRecentSearch(document.getElementById('source').value, document.getElementById('destination').value);
+
         resDiv.innerHTML = "<div class='text-center mt-3'><div class='spinner-border text-primary'></div><p>Searching...</p></div>";
 
         let html = "";
@@ -534,7 +593,7 @@
         });
     });
 
-    // 5. TRACKING LOGIC (Updated to Sync Linear Tracker with Map Updates)
+    // 5. TRACKING LOGIC (With Satellite View Dropdown)
     function track(busNum) {
         const mapDiv = document.getElementById('map-container');
         mapDiv.style.display = 'block';
@@ -553,8 +612,25 @@
         setTimeout(() => {
             mapDiv.scrollIntoView({ behavior: 'smooth' });
             if (!map) {
-                map = L.map('map').setView([10.0, 76.0], 10);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+                // Define Layers
+                const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
+                const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles &copy; Esri'
+                });
+
+                map = L.map('map', {
+                    center: [10.0, 76.0],
+                    zoom: 10,
+                    layers: [streetLayer] // Default to streets
+                });
+
+                // Add Layer Control
+                const baseMaps = {
+                    "Street View": streetLayer,
+                    "Satellite View": satelliteLayer
+                };
+                L.control.layers(baseMaps).addTo(map);
+
             }
             map.invalidateSize();
         }, 100);
@@ -566,10 +642,8 @@
         const updateTimeline = (lat, lng) => {
             if(!busDetails || !busDetails.route) return;
 
-            // Note: Since we don't have GPS coordinates for stops in the DB, 
-            // we use Time-based progress relative to Current Time as the best proxy 
-            // for the "Nearest Stop" visual on the linear tracker.
-            // This is re-calculated every time the map location updates (onSnapshot).
+            // Note: Uses logic as requested by user - relying on time progression
+            // to estimate "Nearest Stop" visual on the linear tracker.
             
             const now = new Date();
             const currentHours = now.getHours();
