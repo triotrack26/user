@@ -50,7 +50,7 @@
             <i class="fas fa-bus-alt me-2 text-warning"></i>TrioTrack <span class="badge bg-secondary ms-1">ADMIN</span>
         </span>
         <div>
-            <a href="index.html" class="btn btn-outline-light btn-sm me-2">User View</a>
+            <a href="user_dashboard.html" class="btn btn-outline-light btn-sm me-2">User View</a>
             <button id="logoutBtn" class="btn btn-outline-danger btn-sm">Logout</button>
         </div>
     </div>
@@ -306,14 +306,7 @@
                 document.getElementById('endPoint').value = data.route[data.route.length-1].name;
                 document.getElementById('endTime').value = data.route[data.route.length-1].time;
 
-                // Handle Intermediate Stops
-                const container = document.getElementById('stops-container');
-                // Remove existing dynamic stops first (keep start, we need to clear intermediate)
-                // Simplified: We will reload page or manually clear intermediate. 
-                // For this logic, let's just populate the first few or let user add.
-                
-                // Note: Complete dynamic repopulation requires clearing current container logic.
-                // For this snippet, we shift to the "Add Route" tab and delete old doc.
+                // Handle Intermediate Stops - Remove old doc then switch tab
                 await deleteDoc(doc(db, "routes", id));
                 
                 document.querySelector('[href="#"][id="tab-route"]').click();
