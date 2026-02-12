@@ -2,192 +2,193 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>TrioTrack Admin Dashboard</title>
+    <title>TrioTrack Driver Partner</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
-        body { background-color: #f8f9fa; }
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&family=Roboto:wght@300;400;500&display=swap');
+
+        body { font-family: 'Roboto', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        h1, h2, h3, h4 { font-family: 'Montserrat', sans-serif; }
+
+        body.dark-mode { background-color: #121212 !important; color: #ffffff !important; }
+        .dark-mode .card { background-color: #1e1e1e; border-color: #333; color: white; }
+        .dark-mode .form-control { background-color: #2d2d2d; color: #fff; border-color: #444; }
         
-        /* Login Overlay */
-        #login-overlay { 
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: linear-gradient(135deg, #212529, #343a40); 
-            z-index: 9999; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+        /* SPA ANIMATION */
+        .page-section { display: none; animation: slideUp 0.4s ease-out; padding-bottom: 80px; }
+        .page-section.active { display: block; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .brand-text {
+            background: linear-gradient(90deg, #ffc107, #fd7e14);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
         }
 
-        .nav-pills .nav-link.active { background-color: #212529; }
-        .nav-pills .nav-link { color: #212529; }
-        .card { border: none; border-radius: 10px; }
+        .section-card {
+            cursor: pointer; transition: 0.3s; border: none; border-bottom: 4px solid #ffc107;
+            background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .section-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+
+        .pulse-status { width: 15px; height: 15px; background: #198754; border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(25, 135, 84, 0); } 100% { box-shadow: 0 0 0 0 rgba(25, 135, 84, 0); } }
+
+        /* Lock Screen Overlay */
+        #lock-overlay {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: black; color: #333; z-index: 9999;
+            display: none; align-items: center; justify-content: center; flex-direction: column;
+        }
     </style>
 </head>
 <body class="bg-light">
 
-<!-- LOGIN OVERLAY -->
-<div id="login-overlay">
-    <div class="card p-5 text-center shadow-lg" style="width: 350px;">
-        <div class="mb-4"><i class="fas fa-user-shield fa-3x text-primary"></i></div>
-        <h4 class="mb-2 fw-bold">Admin Portal</h4>
-        <p class="text-muted small mb-4">Secure Access Only</p>
-        
-        <div id="system-status" class="alert alert-secondary p-1 small mb-3">Initializing...</div>
-
-        <div class="form-floating mb-3">
-            <input type="password" id="adminPass" class="form-control" placeholder="Password">
-            <label for="adminPass">Master Password</label>
-        </div>
-        
-        <button id="loginBtn" class="btn btn-primary w-100 py-2 fw-bold" disabled>AUTHENTICATE</button>
-        <p class="text-danger mt-3 small fw-bold" id="loginMsg"></p>
-    </div>
-</div>
-
-<!-- DASHBOARD -->
-<nav class="navbar navbar-dark bg-dark shadow-sm">
+<!-- NAVBAR -->
+<nav class="navbar navbar-dark bg-dark sticky-top shadow-sm">
     <div class="container-fluid">
-        <span class="navbar-brand fw-bold">
-            <i class="fas fa-bus-alt me-2 text-warning"></i>TrioTrack <span class="badge bg-secondary ms-1">ADMIN</span>
+        <span class="navbar-brand fw-bold small">
+            <i class="fas fa-bus-alt text-warning me-2"></i>TRIOTRACK <span class="badge bg-warning text-dark ms-1">PARTNER</span>
         </span>
-        <div>
-            <a href="user_dashboard.html" class="btn btn-outline-light btn-sm me-2">User View</a>
-            <button id="logoutBtn" class="btn btn-outline-danger btn-sm">Logout</button>
+        <div class="d-flex align-items-center gap-2 text-white">
+            <small id="time-display" class="d-none d-sm-block font-monospace"></small>
+            <button class="btn btn-sm btn-outline-secondary rounded-circle" onclick="toggleTheme()">
+                <i class="fas fa-adjust"></i>
+            </button>
         </div>
     </div>
 </nav>
 
+<!-- Screen Saver / Lock Overlay -->
+<div id="lock-overlay">
+    <i class="fas fa-lock fa-3x mb-3 text-secondary"></i>
+    <h3 class="text-secondary">Tracking Active</h3>
+    <small>Tap & Hold to Unlock</small>
+    <button class="btn btn-outline-secondary mt-5" id="unlockBtn">Unlock Screen</button>
+</div>
+
 <div class="container mt-4">
-    <div class="row">
-        <!-- Sidebar Navigation -->
-        <div class="col-md-3 mb-4">
-            <div class="list-group shadow-sm">
-                <a href="#" class="list-group-item list-group-item-action active fw-bold" id="tab-route">
-                    <i class="fas fa-plus-circle me-2"></i> Add Route
-                </a>
-                <a href="#" class="list-group-item list-group-item-action fw-bold" id="tab-fleet">
-                    <i class="fas fa-list-alt me-2"></i> Manage Fleet
-                </a>
-                <a href="#" class="list-group-item list-group-item-action fw-bold" id="tab-driver">
-                    <i class="fas fa-id-card me-2"></i> Create Driver
-                </a>
+
+    <!-- PAGE 1: WELCOME -->
+    <div id="page-welcome" class="page-section active text-center pt-4">
+        <h1 class="display-4 fw-bold brand-text mb-2">DRIVER CONSOLE</h1>
+        <p class="text-muted letter-spacing-2">REAL-TIME TELEMETRY SYSTEM</p>
+        
+        <div class="my-5">
+            <img src="https://cdn-icons-png.flaticon.com/512/3066/3066259.png" alt="Driver" width="120" class="mb-4 drop-shadow">
+            <div class="card p-3 shadow-sm mx-auto" style="max-width: 500px;">
+                <p class="mb-0 small text-muted">
+                    Welcome to the TrioTrack Partner Network. Broadcast your location securely to assist thousands of commuters.
+                </p>
             </div>
         </div>
 
-        <!-- Content Area -->
-        <div class="col-md-9">
-            
-            <!-- SECTION 1: ADD ROUTE -->
-            <div id="route-section">
-                <div class="card p-4 shadow-sm">
-                    <h5 class="mb-4 border-bottom pb-2">Create New Route</h5>
-                    <form id="routeForm">
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label class="small text-muted">Bus Name</label>
-                                <input type="text" id="busName" class="form-control" placeholder="e.g. Blue Express" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="small text-muted">Bus Number (ID)</label>
-                                <input type="text" id="busNumber" class="form-control" placeholder="e.g. KL-01-AB-1234" required>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="small text-muted">Category</label>
-                            <select id="category" class="form-select">
-                                <option>Public Bus (KSRTC)</option>
-                                <option>Private Bus</option>
-                                <option>Interstate</option>
-                                <option>Institution</option>
-                            </select>
-                        </div>
-                        
-                        <div class="bg-light p-3 rounded mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="text-primary m-0"><i class="fas fa-map-signs me-2"></i>Route Configuration</h6>
-                                <button type="button" class="btn btn-sm btn-outline-success" id="addStopBtn"><i class="fas fa-plus"></i> Add Stop</button>
-                            </div>
-                            
-                            <div id="stops-container">
-                                <div class="input-group mb-2">
-                                    <span class="input-group-text bg-success text-white">Start</span>
-                                    <input type="text" id="startPoint" class="form-control" placeholder="Start Location" required>
-                                    <input type="time" id="startTime" class="form-control" required>
-                                </div>
-                                <!-- Initial Intermediate Stops -->
-                                <div class="input-group mb-2 intermediate-stop">
-                                    <span class="input-group-text">Via</span>
-                                    <input type="text" class="form-control stop-loc" placeholder="Intermediate Stop">
-                                    <input type="time" class="form-control stop-time">
-                                </div>
-                                <div class="input-group mb-2 intermediate-stop">
-                                    <span class="input-group-text">Via</span>
-                                    <input type="text" class="form-control stop-loc" placeholder="Intermediate Stop">
-                                    <input type="time" class="form-control stop-time">
-                                </div>
-                            </div>
-                             <div class="input-group mt-3">
-                                <span class="input-group-text bg-danger text-white">End</span>
-                                <input type="text" id="endPoint" class="form-control" placeholder="Destination" required>
-                                <input type="time" id="endTime" class="form-control" required>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-dark w-100 py-2">Save Route Configuration</button>
-                    </form>
+        <button onclick="navigateTo('page-sections')" class="btn btn-warning btn-lg w-75 rounded-pill shadow fw-bold">
+            Start Session <i class="fas fa-arrow-right ms-2"></i>
+        </button>
+    </div>
+
+    <!-- PAGE 2: SECTIONS -->
+    <div id="page-sections" class="page-section">
+        <h4 class="mb-4 text-center fw-bold">Select Fleet Category</h4>
+        <div class="row g-3">
+            <div class="col-6">
+                <div class="card section-card p-4 text-center h-100" onclick="proceedToLogin('Private Bus')">
+                    <i class="fas fa-bus text-warning fa-2x mb-2"></i>
+                    <h6 class="fw-bold">PRIVATE</h6>
                 </div>
             </div>
-
-            <!-- SECTION 2: MANAGE FLEET -->
-            <div id="fleet-section" class="d-none">
-                <div class="card p-4 shadow-sm">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="m-0">Fleet Overview</h5>
-                        <button class="btn btn-sm btn-outline-primary" id="refreshFleet"><i class="fas fa-sync"></i> Refresh</button>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover small">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>Bus No</th>
-                                    <th>Name</th>
-                                    <th>Category</th>
-                                    <th>Route Detail</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="fleetTableBody">
-                                <tr><td colspan="5" class="text-center">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+            <div class="col-6">
+                <div class="card section-card p-4 text-center h-100" onclick="proceedToLogin('KSRTC')">
+                    <i class="fas fa-landmark text-success fa-2x mb-2"></i>
+                    <h6 class="fw-bold">KSRTC</h6>
                 </div>
             </div>
-
-            <!-- SECTION 3: DRIVER ACCOUNTS -->
-            <div id="driver-section" class="d-none">
-                <div class="card p-4 border-warning shadow-sm" style="border-width: 2px;">
-                    <h5 class="text-warning mb-3"><i class="fas fa-key me-2"></i>Generate Driver Credentials</h5>
-                    <form id="driverForm">
-                        <div class="mb-3">
-                            <label class="form-label">Bus Number (Username)</label>
-                            <input type="text" id="driverBusID" class="form-control" placeholder="Must match Route Bus Number" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Set Password</label>
-                            <input type="text" id="driverPass" class="form-control" placeholder="Secure Password" required>
-                        </div>
-                        <button type="submit" class="btn btn-warning w-100 fw-bold">Create Driver Account</button>
-                    </form>
+            <div class="col-6">
+                <div class="card section-card p-4 text-center h-100" onclick="proceedToLogin('Interstate')">
+                    <i class="fas fa-road text-danger fa-2x mb-2"></i>
+                    <h6 class="fw-bold">INTERSTATE</h6>
                 </div>
             </div>
-
+            <div class="col-6">
+                <div class="card section-card p-4 text-center h-100" onclick="alert('Module locked for updates.')">
+                    <i class="fas fa-university text-secondary fa-2x mb-2"></i>
+                    <h6 class="fw-bold">INSTITUTE</h6>
+                </div>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <button onclick="navigateTo('page-welcome')" class="btn btn-link text-muted">Go Back</button>
         </div>
     </div>
+
+    <!-- PAGE 3: LOGIN -->
+    <div id="page-login" class="page-section">
+        <div class="card mx-auto shadow border-0" style="max-width: 400px;">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <h3 class="fw-bold">Verification</h3>
+                    <span id="login-category-display" class="badge bg-secondary">Fleet Access</span>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="small text-muted fw-bold">BUS NUMBER (ID)</label>
+                    <input type="text" id="busNumber" class="form-control form-control-lg bg-light" placeholder="e.g. KL-01" style="text-transform: uppercase;">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="small text-muted fw-bold">SECURE PIN</label>
+                    <input type="password" id="password" class="form-control form-control-lg bg-light" placeholder="••••••">
+                </div>
+                
+                <button id="loginBtn" class="btn btn-dark w-100 py-3 fw-bold shadow-sm">
+                    AUTHENTICATE & START <i class="fas fa-satellite-dish ms-2"></i>
+                </button>
+                <p id="msg" class="text-center text-danger mt-3 small fw-bold"></p>
+                <button onclick="navigateTo('page-sections')" class="btn btn-sm w-100 text-muted mt-2">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE 4: ACTIVE DASHBOARD -->
+    <div id="page-dashboard" class="page-section text-center pt-5">
+        <div class="card shadow-lg border-0 mb-4 position-relative overflow-hidden">
+            <div class="position-absolute top-0 start-0 w-100" style="height: 5px; background: #198754;"></div>
+            <div class="card-body p-5">
+                <div class="pulse-status mb-3"></div>
+                <h6 class="text-success fw-bold letter-spacing-2">BROADCASTING LIVE</h6>
+                <h1 id="displayBus" class="display-1 fw-bold my-2">--</h1>
+                <p class="text-muted small">GPS Coordinates are being updated.</p>
+                <button class="btn btn-outline-secondary btn-sm rounded-pill mt-2" onclick="enableLockMode()">
+                    <i class="fas fa-lock me-1"></i> Screen Lock (Battery Saver)
+                </button>
+            </div>
+        </div>
+
+        <div class="card bg-dark text-white p-3 mx-auto shadow" style="max-width: 500px;">
+            <div class="d-flex justify-content-between border-bottom border-secondary pb-2 mb-2">
+                <small>Telemetry Log</small>
+                <small class="text-info"><i class="fas fa-sync fa-spin"></i> Active</small>
+            </div>
+            <p id="logs" class="mb-0 font-monospace small text-start ps-2">Waiting for satellite lock...</p>
+        </div>
+        
+        <button id="signOutBtn" class="btn btn-outline-danger mt-5 px-5 py-2 rounded-pill fw-bold">
+            <i class="fas fa-power-off me-2"></i> End Trip
+        </button>
+    </div>
+
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, setDoc, doc, getDoc, getDocs, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+    // 1. FIREBASE LOGIC (UNCHANGED)
     const firebaseConfig = {
       apiKey: "AIzaSyDcWwo0m2eS1ndyC06U1G_JF1J7Y1WNlfQ",
       authDomain: "triotrack-66dd6.firebaseapp.com",
@@ -200,181 +201,89 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    let watchID = null;
+    let isTracking = false;
 
-    document.getElementById('system-status').innerText = "System Online";
-    document.getElementById('system-status').classList.replace('alert-secondary', 'alert-success');
-    document.getElementById('loginBtn').disabled = false;
-
-    // Helper: Time Format
-    const formatTime = (timeStr) => {
-        if(!timeStr || timeStr === "N/A") return "";
-        const [hours, minutes] = timeStr.split(':');
-        const h = parseInt(hours);
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const h12 = h % 12 || 12;
-        return `${h12}:${minutes} ${ampm}`;
+    window.navigateTo = (pageId) => {
+        document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        window.scrollTo(0, 0);
     };
+
+    window.proceedToLogin = (cat) => {
+        document.getElementById('login-category-display').innerText = cat;
+        navigateTo('page-login');
+    };
+
+    window.toggleTheme = () => document.body.classList.toggle('dark-mode');
+
+    // 2. SAFETY: Prevent Tab Closure
+    window.addEventListener('beforeunload', (event) => {
+        if (isTracking) {
+            event.preventDefault();
+            event.returnValue = ''; // Trigger browser warning
+        }
+    });
+
+    // Screen Lock Features
+    window.enableLockMode = () => {
+        document.getElementById('lock-overlay').style.display = 'flex';
+    };
+    document.getElementById('unlockBtn').addEventListener('click', () => {
+        document.getElementById('lock-overlay').style.display = 'none';
+    });
+
+    setInterval(() => {
+        document.getElementById('time-display').innerText = new Date().toLocaleTimeString();
+    }, 1000);
 
     document.getElementById('loginBtn').addEventListener('click', async () => {
-        const inputPass = document.getElementById('adminPass').value.trim();
-        const msg = document.getElementById('loginMsg');
-        if (!inputPass) return;
+        const busNum = document.getElementById('busNumber').value.toUpperCase().trim();
+        const pass = document.getElementById('password').value.trim();
+        const msg = document.getElementById('msg');
+        if (!busNum || !pass) return msg.innerText = "Credentials Required";
+        
+        document.getElementById('loginBtn').disabled = true;
+        msg.innerText = "Verifying...";
+
         try {
-            const docSnap = await getDoc(doc(db, "credentials", "admin_master"));
-            if (docSnap.exists() && inputPass === docSnap.data().password) {
-                document.getElementById('login-overlay').style.display = 'none';
-            } else { msg.innerText = "Invalid Password"; }
-        } catch (error) { msg.innerText = "Connection Error"; }
+            const docSnap = await getDoc(doc(db, "credentials", busNum));
+            if (docSnap.exists() && docSnap.data().password === pass) {
+                startTracking(busNum);
+            } else {
+                msg.innerText = "Invalid ID or Password";
+                document.getElementById('loginBtn').disabled = false;
+            }
+        } catch (e) { 
+            msg.innerText = "Network Error";
+            document.getElementById('loginBtn').disabled = false;
+        }
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', () => location.reload());
+    function startTracking(busNum) {
+        navigateTo('page-dashboard');
+        document.getElementById('displayBus').innerText = busNum;
+        isTracking = true; // Sets the safety flag
 
-    const tabs = { 'tab-route': 'route-section', 'tab-fleet': 'fleet-section', 'tab-driver': 'driver-section' };
-    Object.keys(tabs).forEach(tabId => {
-        document.getElementById(tabId).addEventListener('click', (e) => {
-            e.preventDefault();
-            document.querySelectorAll('.list-group-item').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.col-md-9 > div').forEach(el => el.classList.add('d-none'));
-            e.target.closest('.list-group-item').classList.add('active');
-            document.getElementById(tabs[tabId]).classList.remove('d-none');
-            if(tabId === 'tab-fleet') fetchFleet();
-        });
-    });
-
-    // --- MANAGE FLEET FUNCTIONS ---
-    async function fetchFleet() {
-        const tbody = document.getElementById('fleetTableBody');
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Loading Data...</td></tr>';
-        try {
-            const querySnapshot = await getDocs(collection(db, "routes"));
-            let html = "";
-            querySnapshot.forEach((docSnap) => {
-                const data = docSnap.data();
-                const docId = docSnap.id;
-                
-                // Detailed Route String
-                let routeDetail = "";
-                if(data.route && Array.isArray(data.route)){
-                    routeDetail = data.route.map(r => `<span class="badge bg-secondary me-1">${r.name} (${formatTime(r.time)})</span>`).join(" > ");
-                } else {
-                    routeDetail = "No Route Data";
-                }
-
-                // Prepare Data for Edit (Store in JSON string)
-                const jsonData = JSON.stringify(data).replace(/"/g, '&quot;');
-
-                html += `
-                <tr>
-                    <td><strong>${data.busNumber}</strong></td>
-                    <td>${data.busName}</td>
-                    <td>${data.category}</td>
-                    <td>${routeDetail}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-warning mb-1" onclick="editRoute('${docId}', '${jsonData}')"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-outline-danger mb-1" onclick="deleteRoute('${docId}')"><i class="fas fa-trash"></i></button>
-                    </td>
-                </tr>`;
-            });
-            tbody.innerHTML = html || '<tr><td colspan="5" class="text-center">No routes found.</td></tr>';
-        } catch(e) { tbody.innerHTML = `<tr><td colspan="5" class="text-danger">Error: ${e.message}</td></tr>`; }
+        if (navigator.geolocation) {
+            watchID = navigator.geolocation.watchPosition(async (pos) => {
+                const { latitude, longitude, speed } = pos.coords;
+                try {
+                    await setDoc(doc(db, "locations", busNum), {
+                        busNumber: busNum, lat: latitude, lng: longitude, speed: speed || 0,
+                        lastUpdated: new Date().toISOString()
+                    });
+                    document.getElementById('logs').innerHTML = `> Lat: ${latitude.toFixed(5)}<br>> Lng: ${longitude.toFixed(5)}<br>> Time: ${new Date().toLocaleTimeString()}`;
+                } catch(err) { console.error(err); }
+            }, (err) => alert("GPS Error: " + err.message), { enableHighAccuracy: true });
+        } else { alert("GPS not supported."); }
     }
-    document.getElementById('refreshFleet').addEventListener('click', fetchFleet);
 
-    // Make functions global for inline onclick
-    window.deleteRoute = async (id) => {
-        if(confirm("Are you sure you want to remove this bus and its route?")) {
-            try {
-                await deleteDoc(doc(db, "routes", id));
-                fetchFleet();
-            } catch(e) { alert("Error deleting: " + e.message); }
+    document.getElementById('signOutBtn').addEventListener('click', () => {
+        if(confirm("Are you sure you want to End Trip? GPS will stop broadcasting.")) {
+            isTracking = false; // Disable safety flag
+            location.reload();
         }
-    };
-
-    window.editRoute = async (id, dataStr) => {
-        if(confirm("Load this data into 'Add Route' form for editing? (This will delete the current entry upon saving)")) {
-            const data = JSON.parse(dataStr);
-            
-            // Populate Fields
-            document.getElementById('busName').value = data.busName;
-            document.getElementById('busNumber').value = data.busNumber;
-            document.getElementById('category').value = data.category;
-            
-            // Populate Stops
-            if(data.route && data.route.length > 0) {
-                document.getElementById('startPoint').value = data.route[0].name;
-                document.getElementById('startTime').value = data.route[0].time;
-                document.getElementById('endPoint').value = data.route[data.route.length-1].name;
-                document.getElementById('endTime').value = data.route[data.route.length-1].time;
-
-                // Handle Intermediate Stops - Remove old doc then switch tab
-                await deleteDoc(doc(db, "routes", id));
-                
-                document.querySelector('[href="#"][id="tab-route"]').click();
-                alert("Data loaded. Old entry removed. Please modify and click Save.");
-            }
-        }
-    };
-
-    // --- ADD ROUTE FUNCTIONS ---
-    document.getElementById('addStopBtn').addEventListener('click', () => {
-        const container = document.getElementById('stops-container');
-        const div = document.createElement('div');
-        div.className = 'input-group mb-2 intermediate-stop';
-        div.innerHTML = `
-            <span class="input-group-text">Via</span>
-            <input type="text" class="form-control stop-loc" placeholder="Intermediate Stop">
-            <input type="time" class="form-control stop-time">
-            <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">X</button>
-        `;
-        container.appendChild(div);
-    });
-
-    document.getElementById('routeForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        let stops = [];
-        // Start
-        stops.push({ name: document.getElementById('startPoint').value, time: document.getElementById('startTime').value });
-        
-        // Intermediate
-        document.querySelectorAll('.intermediate-stop').forEach(div => {
-            const loc = div.querySelector('.stop-loc').value;
-            const time = div.querySelector('.stop-time').value;
-            if(loc && loc.trim() !== "") stops.push({ name: loc, time: time || "N/A" });
-        });
-        
-        // End
-        stops.push({ name: document.getElementById('endPoint').value, time: document.getElementById('endTime').value });
-
-        const busData = {
-            busName: document.getElementById('busName').value,
-            busNumber: document.getElementById('busNumber').value.toUpperCase(),
-            category: document.getElementById('category').value,
-            route: stops,
-            searchKeywords: stops.map(s => s.name.toLowerCase().trim())
-        };
-
-        try {
-            await addDoc(collection(db, "routes"), busData);
-            alert("Route configuration saved successfully!"); 
-            e.target.reset();
-            // Reset dynamic fields
-            const container = document.getElementById('stops-container');
-            const dynamics = container.querySelectorAll('.intermediate-stop');
-            if(dynamics.length > 2) {
-                 // Remove extras beyond default 2
-                 for(let i=2; i<dynamics.length; i++) dynamics[i].remove();
-            }
-        } catch (err) { alert("Error: " + err.message); }
-    });
-
-    document.getElementById('driverForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const busID = document.getElementById('driverBusID').value.toUpperCase().trim();
-        const pass = document.getElementById('driverPass').value.trim();
-        try {
-            await setDoc(doc(db, "credentials", busID), { password: pass });
-            alert(`Account created for ${busID}`); e.target.reset();
-        } catch (error) { alert("Error: " + error.message); }
     });
 </script>
 </body>
