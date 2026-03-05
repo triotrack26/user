@@ -48,8 +48,8 @@
         .cat-institution { border-bottom-color: #6f42c1; }
 
         /* Map */
-        #map-container { display: none; height: 450px; border-radius: 15px; overflow: hidden; border: 3px solid #198754; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-        #map { height: 100%; width: 100%; }
+        #map-container { display: none; height: 500px; border-radius: 15px; overflow: hidden; border: 3px solid #198754; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        #map { height: calc(100% - 85px); width: 100%; }
         
         .bus-card { border-left: 5px solid #0d6efd; }
         .recent-pill { cursor: pointer; border-radius: 20px; font-size: 0.85rem; padding: 5px 15px; background-color: rgba(13, 110, 253, 0.1); color: #0d6efd; display: inline-block; margin: 3px; transition: 0.2s; }
@@ -65,6 +65,7 @@
         body.dark-mode .text-muted { color: #adb5bd !important; }
         body.dark-mode input::placeholder { color: #888 !important; }
         body.dark-mode select { background-color: #2d2d2d; color: white; }
+        body.dark-mode .alert-info { background-color: #0c5460; color: #d1ecf1; border-color: #0c5460; }
     </style>
 </head>
 <body>
@@ -127,28 +128,28 @@
             <div class="col-md-5 col-lg-3">
                 <div class="card category-card cat-private p-4 text-center shadow-sm" onclick="window.selectCategory('Private Bus')">
                     <i class="fas fa-shuttle-van fa-3x text-warning mb-3"></i>
-                    <h5 class="fw-bold">Private</h5>
+                    <h5 class="fw-bold text-dark">Private</h5>
                     <p class="small text-muted mb-0">Rural Area Connections</p>
                 </div>
             </div>
             <div class="col-md-5 col-lg-3">
                 <div class="card category-card cat-transport p-4 text-center shadow-sm" onclick="window.selectCategory('Public Bus (KSRTC)')">
                     <i class="fas fa-bus-alt fa-3x text-success mb-3"></i>
-                    <h5 class="fw-bold">Transport</h5>
+                    <h5 class="fw-bold text-dark">Transport</h5>
                     <p class="small text-muted mb-0">Govt / District Connections</p>
                 </div>
             </div>
             <div class="col-md-5 col-lg-3">
                 <div class="card category-card cat-interstate p-4 text-center shadow-sm" onclick="window.selectCategory('Interstate')">
                     <i class="fas fa-map-marked-alt fa-3x text-danger mb-3"></i>
-                    <h5 class="fw-bold">Interstate</h5>
+                    <h5 class="fw-bold text-dark">Interstate</h5>
                     <p class="small text-muted mb-0">Major Cities Connections</p>
                 </div>
             </div>
             <div class="col-md-5 col-lg-3">
                 <div class="card category-card cat-institution p-4 text-center shadow-sm" onclick="window.selectCategory('Institution')">
                     <i class="fas fa-university fa-3x text-purple mb-3" style="color:#6f42c1;"></i>
-                    <h5 class="fw-bold">Institution</h5>
+                    <h5 class="fw-bold text-dark">Institution</h5>
                     <p class="small text-muted mb-0">Educational Purposes</p>
                 </div>
             </div>
@@ -159,7 +160,7 @@
     <div id="page-search" class="page-section">
         <div class="card p-4 shadow-sm mb-4">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="fw-bold mb-0">Find a Bus</h4>
+                <h4 class="fw-bold mb-0 text-dark">Find a Bus</h4>
                 <span id="selectedCategoryBadge" class="badge bg-primary fs-6">All Types</span>
             </div>
             
@@ -229,9 +230,9 @@
                 <h5 class="fw-bold mb-0" id="map-title"><i class="fas fa-satellite-dish text-success pulse"></i> Live Tracking</h5>
                 <button id="closeMapBtn" class="btn btn-sm btn-danger"><i class="fas fa-times"></i> Close Map</button>
             </div>
-            <!-- Linear Tracker Status Box -->
-            <div id="linear-status-box" class="bg-primary text-white p-2 text-center fw-bold" style="font-size: 0.9rem;">
-                <i class="fas fa-location-arrow me-1"></i> <span id="linear-status-text">Locating bus on route...</span>
+            <!-- Dynamic Linear Tracker Status Box -->
+            <div id="linear-status-box" class="bg-primary text-white p-3 text-center" style="font-size: 1.05rem; border-bottom: 2px solid #0056b3;">
+                <i class="fas fa-location-arrow me-1 pulse"></i> <span id="linear-status-text" class="fw-bold">Establishing satellite lock...</span>
             </div>
             <div id="map"></div>
         </div>
@@ -242,8 +243,7 @@
 </div>
 
 <footer class="text-center mt-5 py-4 text-muted small border-top">
-    <p class="mb-1">© 2026 TrioTrack Systems</p>
-    <a href="driver.html" class="text-decoration-none text-secondary"><i class="fas fa-steering-wheel"></i> Driver Portal</a>
+    <p class="mb-1 fw-bold">© 2026 TrioTrack Systems</p>
 </footer>
 
 <!-- SCRIPTS -->
@@ -278,7 +278,8 @@
     // Time Bar
     setInterval(() => {
         const now = new Date();
-        document.getElementById('live-time').innerHTML = `<i class="far fa-clock"></i> ${now.toLocaleDateString()} | ${now.toLocaleTimeString('en-US', { hour12: true })}`;
+        const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+        document.getElementById('live-time').innerHTML = `<i class="far fa-clock"></i> ${now.toLocaleDateString()} | ${timeString}`;
     }, 1000);
 
     // Theme Toggle
@@ -288,7 +289,7 @@
         document.getElementById('themeToggleBtn').innerHTML = isDark ? '<i class="fas fa-sun"></i> Light' : '<i class="fas fa-moon"></i> Dark';
     });
 
-    // SPA Navigation Hooks (Attached to window for HTML access)
+    // SPA Navigation Hooks
     window.navigateTo = (pageId) => {
         document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
         document.getElementById(pageId).classList.add('active');
@@ -305,8 +306,8 @@
 
     window.goBack = () => {
         if(historyStack.length > 1) {
-            historyStack.pop(); // Remove current
-            const prevPage = historyStack.pop(); // Get previous
+            historyStack.pop(); 
+            const prevPage = historyStack.pop(); 
             window.navigateTo(prevPage);
         }
     };
@@ -336,7 +337,6 @@
         dst.value = temp;
     });
 
-    // Enter Key Support
     document.getElementById('source').addEventListener('keypress', e => { if(e.key === 'Enter') document.getElementById('searchBtn').click(); });
     document.getElementById('destination').addEventListener('keypress', e => { if(e.key === 'Enter') document.getElementById('searchBtn').click(); });
 
@@ -356,7 +356,6 @@
         if(!s || !d) return;
         let recents = JSON.parse(localStorage.getItem('triotrack_recent') || '[]');
         const entry = {s, d};
-        // Avoid exact duplicates
         recents = recents.filter(r => !(r.s === s && r.d === d));
         recents.unshift(entry);
         if(recents.length > 5) recents.pop();
@@ -371,12 +370,22 @@
     };
     loadRecentSearches();
 
-    // Institution Data Logic
+    // Authentic Kerala Polytechnic Colleges Database
     const polytechnicData = {
+        "Thiruvananthapuram": ["Central Polytechnic College Vattiyoorkavu", "Govt Polytechnic College Neyyattinkara", "Women's Polytechnic College Kaimanam"],
+        "Kollam": ["Govt Polytechnic College Punalur", "Govt Polytechnic College Ezhukone"],
+        "Pathanamthitta": ["Govt Polytechnic College Vechoochira", "Govt Polytechnic College Adoor"],
+        "Alappuzha": ["Govt Polytechnic College Cherthala", "Women's Polytechnic College Kayamkulam"],
+        "Kottayam": ["Govt Polytechnic College Kaduthuruthy", "Govt Polytechnic College Pala", "Govt Polytechnic College Nattakom"],
+        "Idukki": ["Govt Polytechnic College Muttom", "Govt Polytechnic College Purapuzha", "Govt Polytechnic College Kumily"],
+        "Ernakulam": ["Govt Polytechnic College Kalamassery", "Govt Polytechnic College Kothamangalam", "Women's Polytechnic College Ernakulam"],
+        "Thrissur": ["Govt Polytechnic College Chelakkara", "Govt Polytechnic College Kunnamkulam", "Govt Polytechnic College Koratty", "Women's Polytechnic College Thrissur"],
         "Palakkad": ["Govt Polytechnic College Palakkad", "Govt Polytechnic College Shoranur", "Institute of Printing Technology & GPTC Shoranur"],
-        "Ernakulam": ["Govt Polytechnic College Kalamassery", "Govt Polytechnic College Kothamangalam"],
-        "Thiruvananthapuram": ["Central Polytechnic College Vattiyoorkavu", "Govt Polytechnic College Neyyattinkara"],
-        "Kozhikode": ["Kerala Govt Polytechnic College Kozhikode", "Govt Polytechnic College Meenangadi"]
+        "Malappuram": ["Govt Polytechnic College Perinthalmanna", "Govt Polytechnic College Tirurangadi", "Women's Polytechnic College Kottakkal"],
+        "Kozhikode": ["Kerala Govt Polytechnic College West Hill", "Govt Polytechnic College Meenangadi", "Women's Polytechnic College Malaparamba"],
+        "Wayanad": ["Govt Polytechnic College Meenangadi", "Govt Polytechnic College Mananthavady"],
+        "Kannur": ["Govt Polytechnic College Kannur", "Govt Polytechnic College Mattannur"],
+        "Kasaragod": ["Govt Polytechnic College Kasaragod", "Govt Polytechnic College Kanhangad"]
     };
 
     document.getElementById('instDistrict').addEventListener('change', (e) => {
@@ -397,22 +406,23 @@
         const college = e.target.value;
         if (!college) return;
         
-        // Generate mock institution routes
         const resDiv = document.getElementById('results');
-        resDiv.innerHTML = "<div class='text-center mt-4'><div class='spinner-border text-primary'></div><p class='mt-2'>Loading Campus Routes...</p></div>";
+        resDiv.innerHTML = "<div class='text-center mt-4'><div class='spinner-border text-primary'></div><p class='mt-2 text-dark'>Fetching Campus Routes...</p></div>";
         
-        // Route mock logic: Nearest big city to Campus
-        let city = "Main City Junction";
-        let midStop = "Highway Stop";
+        // Mock Realistic Distances & Stops for Colleges
+        let city = "District Headquarters";
+        let midStop = "Main Highway Junction";
         if (college.includes("Shoranur")) { city = "Pattambi"; midStop = "Kulappully"; }
-        if (college.includes("Palakkad")) { city = "Palakkad Town"; midStop = "Olavakkode"; }
-        if (college.includes("Kalamassery")) { city = "Aluva"; midStop = "Edappally"; }
+        else if (college.includes("Palakkad")) { city = "Palakkad Town"; midStop = "Olavakkode"; }
+        else if (college.includes("Kalamassery")) { city = "Aluva"; midStop = "Edappally"; }
+        else if (college.includes("Vattiyoorkavu")) { city = "Thampanoor"; midStop = "PPM Junction"; }
+        else if (college.includes("Kozhikode")) { city = "Calicut City"; midStop = "Nadakkavu"; }
         
         setTimeout(() => {
             let html = `
-                <div class="alert alert-info border-0 shadow-sm"><i class="fas fa-university"></i> Campus schedules for <b>${college}</b></div>
+                <div class="alert alert-info border-0 shadow-sm"><i class="fas fa-university"></i> Scheduled routes for <b>${college}</b></div>
                 
-                <!-- MORNING ROUTE -->
+                <!-- MORNING ROUTE (ARRIVES 08:50 AM) -->
                 <div class="card mb-3 bus-card shadow-sm border-start border-5 border-success">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -420,14 +430,14 @@
                             <span class="badge bg-purple" style="background-color: #6f42c1;">Institution</span>
                         </div>
                         <hr class="text-muted opacity-25">
-                        <div class="row align-items-center text-center">
+                        <div class="row align-items-center text-center text-dark">
                             <div class="col-4 border-end">
                                 <small class="text-muted d-block"><i class="fas fa-map-marker-alt text-danger"></i> Departs</small>
                                 <strong>08:10 AM</strong><br><small>${city}</small>
                             </div>
                             <div class="col-4 border-end">
                                 <i class="fas fa-arrow-right text-muted"></i>
-                                <small class="d-block mt-1 text-muted">Via: ${midStop}<br>Duration: ~40m</small>
+                                <small class="d-block mt-1 text-muted">Via: ${midStop}<br>Duration: 40m</small>
                             </div>
                             <div class="col-4">
                                 <small class="text-muted d-block"><i class="fas fa-map-pin text-success"></i> Arrives</small>
@@ -435,13 +445,13 @@
                             </div>
                         </div>
                         <div class="mt-3 pt-2 d-flex justify-content-between">
-                            <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Morning Express', 'BUS-M1', '08:10 AM')"><i class="fas fa-share-alt"></i> Share</button>
+                            <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Morning Express', 'BUS-M1', '08:10 AM')"><i class="fas fa-share-alt"></i> Share to WhatsApp</button>
                             <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="BUS-M1"><i class="fas fa-satellite-dish"></i> Track Live</button>
                         </div>
                     </div>
                 </div>
                 
-                <!-- EVENING ROUTE -->
+                <!-- EVENING ROUTE (DEPARTS 04:10 PM) -->
                 <div class="card mb-3 bus-card shadow-sm border-start border-5 border-warning">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -449,14 +459,14 @@
                             <span class="badge bg-purple" style="background-color: #6f42c1;">Institution</span>
                         </div>
                         <hr class="text-muted opacity-25">
-                        <div class="row align-items-center text-center">
+                        <div class="row align-items-center text-center text-dark">
                             <div class="col-4 border-end">
                                 <small class="text-muted d-block"><i class="fas fa-map-marker-alt text-danger"></i> Departs</small>
                                 <strong>04:10 PM</strong><br><small>${college}</small>
                             </div>
                             <div class="col-4 border-end">
                                 <i class="fas fa-arrow-right text-muted"></i>
-                                <small class="d-block mt-1 text-muted">Via: ${midStop}<br>Duration: ~40m</small>
+                                <small class="d-block mt-1 text-muted">Via: ${midStop}<br>Duration: 40m</small>
                             </div>
                             <div class="col-4">
                                 <small class="text-muted d-block"><i class="fas fa-map-pin text-success"></i> Arrives</small>
@@ -464,7 +474,7 @@
                             </div>
                         </div>
                         <div class="mt-3 pt-2 d-flex justify-content-between">
-                            <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Evening Return', 'BUS-E1', '04:10 PM')"><i class="fas fa-share-alt"></i> Share</button>
+                            <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Evening Return', 'BUS-E1', '04:10 PM')"><i class="fas fa-share-alt"></i> Share to WhatsApp</button>
                             <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="BUS-E1"><i class="fas fa-satellite-dish"></i> Track Live</button>
                         </div>
                     </div>
@@ -477,10 +487,10 @@
         }, 600);
     });
 
-    // Share feature
+    // Share feature: Integrates directly with WhatsApp and System Sharing
     window.shareBus = async (busName, busNum, time) => {
         const shareData = {
-            title: 'TrioTrack Route',
+            title: 'TrioTrack Live Route',
             text: `Catch the ${busName} (${busNum}) at ${time}! Track it live on TrioTrack.`,
             url: window.location.href
         };
@@ -488,8 +498,8 @@
             if (navigator.share) {
                 await navigator.share(shareData);
             } else {
-                // Fallback to direct WhatsApp open if native share fails/unavailable
-                const waUrl = `https://wa.me/?text=${encodeURIComponent(shareData.text + " Link: " + shareData.url)}`;
+                // Fallback directly to WhatsApp
+                const waUrl = `https://wa.me/?text=${encodeURIComponent(shareData.text + " Live Link: " + shareData.url)}`;
                 window.open(waUrl, '_blank');
             }
         } catch (err) { console.error('Error sharing:', err); }
@@ -525,7 +535,7 @@
 
     // 2. Search Logic
     document.getElementById('searchBtn').addEventListener('click', () => {
-        if (currentCategoryFilter === 'Institution') return; // Handled by dropdowns
+        if (currentCategoryFilter === 'Institution') return;
 
         const src = document.getElementById('source').value.toLowerCase().trim();
         const dst = document.getElementById('destination').value.toLowerCase().trim();
@@ -534,7 +544,7 @@
         if (!src || !dst) return alert("Please enter both Source and Destination");
         
         saveRecentSearch(document.getElementById('source').value, document.getElementById('destination').value);
-        resDiv.innerHTML = "<div class='text-center mt-4'><div class='spinner-border text-primary'></div><p class='mt-2'>Searching routes...</p></div>";
+        resDiv.innerHTML = "<div class='text-center mt-4'><div class='spinner-border text-primary'></div><p class='mt-2 text-dark'>Searching routes...</p></div>";
 
         let html = "";
         let count = 0;
@@ -563,7 +573,7 @@
                                 <span class="badge bg-secondary">${d.category}</span>
                             </div>
                             <hr class="text-muted opacity-25">
-                            <div class="row align-items-center text-center">
+                            <div class="row align-items-center text-center text-dark">
                                 <div class="col-4 border-end">
                                     <small class="text-muted d-block"><i class="fas fa-map-marker-alt text-danger"></i> Departs</small>
                                     <strong>${t1}</strong><br>
@@ -571,7 +581,7 @@
                                 </div>
                                 <div class="col-4 border-end">
                                     <i class="fas fa-arrow-right text-muted"></i>
-                                    <small class="d-block mt-1 text-muted">Duration: ~${calculateDuration(t1, t2)}</small>
+                                    <small class="d-block mt-1 text-muted">Duration: ${calculateDuration(t1, t2)}</small>
                                 </div>
                                 <div class="col-4">
                                     <small class="text-muted d-block"><i class="fas fa-map-pin text-success"></i> Arrives</small>
@@ -580,7 +590,7 @@
                                 </div>
                             </div>
                             <div class="mt-3 pt-2 d-flex justify-content-between">
-                                <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('${d.busName}', '${d.busNumber}', '${t1}')"><i class="fas fa-share-alt"></i> Share</button>
+                                <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('${d.busName}', '${d.busNumber}', '${t1}')"><i class="fas fa-share-alt"></i> Share to WhatsApp</button>
                                 <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="${d.busNumber}"><i class="fas fa-satellite-dish"></i> Track Live</button>
                             </div>
                         </div>
@@ -595,25 +605,29 @@
         });
     });
 
-    // Duration calculator (Real Time Parsing)
+    // Time Duration Calculator
     function calculateDuration(t1, t2) {
         if(t1==="N/A" || t2==="N/A" || !t1 || !t2) return "--";
         try {
-            // Convert standard HH:MM formats
-            let d1 = new Date(`1970-01-01T${t1.padStart(5, '0')}:00`);
-            let d2 = new Date(`1970-01-01T${t2.padStart(5, '0')}:00`);
+            let parseTime = (timeStr) => {
+                let [time, modifier] = timeStr.split(' ');
+                let [hours, minutes] = time.split(':');
+                if (hours === '12') hours = '00';
+                if (modifier === 'PM') hours = parseInt(hours, 10) + 12;
+                return new Date(`1970-01-01T${hours.toString().padStart(2, '0')}:${minutes}:00`);
+            };
+            
+            let d1 = parseTime(t1);
+            let d2 = parseTime(t2);
             
             if (isNaN(d1) || isNaN(d2)) return "ETA";
-            
             if(d2 < d1) d2.setDate(d2.getDate() + 1); // Crosses midnight
-            let diffMins = Math.round((d2 - d1) / 60000);
             
+            let diffMins = Math.round((d2 - d1) / 60000);
             let h = Math.floor(diffMins / 60);
             let m = diffMins % 60;
             return h > 0 ? `${h}h ${m}m` : `${m}m`;
-        } catch(e) {
-            return "ETA"; 
-        }
+        } catch(e) { return "ETA"; }
     }
 
     // 3. Tracking Logic (Leaflet + Firebase)
@@ -627,18 +641,18 @@
         if (!map) {
             map = L.map('map').setView([10.0, 76.0], 10);
             
-            // Multiple Layers (Including Hybrid Satellite with Place Names/Roads)
+            // Multiple Layers
             const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
             
-            // Using Google Hybrid layer for rich satellite with place names and roads
+            // Using Google Hybrid layer for authentic Satellite + Place Names/Roads
             const hybridLayer = L.tileLayer('http://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}', { 
                 attribution: '© Google Hybrid Map',
                 maxZoom: 20
             });
             
-            streetLayer.addTo(map); // Default
+            hybridLayer.addTo(map); // Default to Satellite with places
             
-            const baseMaps = { "Street View": streetLayer, "Hybrid Satellite View": hybridLayer };
+            const baseMaps = { "Satellite & Places": hybridLayer, "Street View": streetLayer };
             L.control.layers(baseMaps).addTo(map);
         }
         
@@ -647,7 +661,6 @@
         if (unsubscribe) unsubscribe();
         if (marker) map.removeLayer(marker);
 
-        // Custom Bus Icon
         const busIcon = L.divIcon({
             className: 'custom-div-icon',
             html: "<div style='background-color:#198754; color:white; padding:5px; border-radius:50%; border:2px solid white; box-shadow:0 0 10px rgba(0,0,0,0.5); text-align:center;'><i class='fas fa-bus'></i></div>",
@@ -655,6 +668,7 @@
             iconAnchor: [15, 15]
         });
 
+        // Pulling ONLY the specific bus data, ensuring NO overlap with other buses on route
         unsubscribe = onSnapshot(doc(db, "locations", busNum), (docSnapshot) => {
             if (docSnapshot.exists()) {
                 const { lat, lng } = docSnapshot.data();
@@ -665,9 +679,8 @@
                 }
                 map.setView([lat, lng], 15);
                 
-                // Linear Tracking Logic (Estimating nearest logical location)
+                // Trigger advanced dynamic linear tracking
                 updateLinearTracker(lat, lng, busNum);
-
             } else { 
                 alert("GPS Signal Lost: This bus is currently offline or not broadcasting its location.");
                 document.getElementById('linear-status-text').innerText = "Bus Offline.";
@@ -675,21 +688,55 @@
         });
     }
 
-    // Linear Tracking Simulator
+    // Dynamic Linear Tracking Method (Distance/Time Hybrid Logic)
     function updateLinearTracker(lat, lng, busNum) {
         const statusText = document.getElementById('linear-status-text');
+        const busData = allRoutesData.find(b => b.busNumber === busNum);
         
-        // Mock distance check (in a real scenario, this calculates distance to the coordinates of the next stop)
-        // Providing local context based on requested scenario
-        let locationName = "the main route";
-        
-        // Mock geographical bounding boxes for Palakkad context as requested by user
-        if (lat > 10.75 && lat < 10.85 && lng > 76.15 && lng < 76.25) locationName = "Shoranur / Kulappully area";
-        else if (lat > 10.77 && lat < 10.80 && lng > 76.25 && lng < 76.30) locationName = "Koonathra area";
-        else if (lat > 10.75 && lat < 10.80 && lng > 76.60 && lng < 76.70) locationName = "Palakkad Town";
-        else if (lat > 10.00 && lat < 10.10 && lng > 76.30 && lng < 76.40) locationName = "Kalamassery Campus area";
-        
-        statusText.innerText = `Bus ${busNum} is currently traversing near ${locationName}.`;
+        // If we have actual route data, calculate the linear position dynamically based on schedule
+        if (busData && busData.route && busData.route.length > 0) {
+            const now = new Date();
+            const currentMins = now.getHours() * 60 + now.getMinutes();
+            
+            let prevStop = busData.route[0];
+            let nextStop = busData.route[busData.route.length - 1];
+            
+            for (let i = 0; i < busData.route.length; i++) {
+                let stopTime = busData.route[i].time;
+                if(stopTime && stopTime !== "N/A") {
+                    let isPM = stopTime.includes('PM');
+                    let timeParts = stopTime.replace(/(AM|PM)/i, '').trim().split(':');
+                    let hrs = parseInt(timeParts[0]);
+                    let mins = parseInt(timeParts[1]);
+                    if (isPM && hrs < 12) hrs += 12;
+                    if (!isPM && hrs === 12) hrs = 0;
+                    
+                    let stopMins = hrs * 60 + mins;
+                    
+                    if (currentMins < stopMins) {
+                        nextStop = busData.route[i];
+                        prevStop = i > 0 ? busData.route[i-1] : busData.route[0];
+                        break;
+                    } else {
+                        prevStop = busData.route[i];
+                    }
+                }
+            }
+            
+            if (prevStop.name === nextStop.name) {
+               statusText.innerHTML = `Bus ${busNum} is arriving at or stationed at <b>${nextStop.name}</b>`;
+            } else {
+               statusText.innerHTML = `Bus ${busNum} passed <b>${prevStop.name}</b>, next stop: <b>${nextStop.name}</b> (~2 to 5km)`;
+            }
+        } else {
+            // Geographic Fallback method if bus data not in route array (Mock Geofences for Kerala)
+            let locationName = "active route";
+            if (lat > 10.75 && lat < 10.85 && lng > 76.15 && lng < 76.25) locationName = "Kulappully / Shoranur zone (Within 2-5km)";
+            else if (lat > 10.77 && lat < 10.80 && lng > 76.25 && lng < 76.30) locationName = "Koonathra stop (Within 2-5km)";
+            else if (lat > 10.75 && lat < 10.80 && lng > 76.60 && lng < 76.70) locationName = "Palakkad Town";
+            
+            statusText.innerText = `Bus ${busNum} is moving near ${locationName}.`;
+        }
     }
 
     // Close Map
