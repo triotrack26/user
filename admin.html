@@ -62,7 +62,7 @@
 <div class="container">
     <ul class="nav nav-tabs mb-4 border-0">
         <li class="nav-item"><a class="nav-link active" id="tab-fleet"><i class="fas fa-list"></i> Manage Fleet</a></li>
-        <li class="nav-item"><a class="nav-link" id="tab-route"><i class="fas fa-route"></i> Add Route</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-route"><i class="fas fa-route"></i> <span id="route-tab-title">Add Route</span></a></li>
         <li class="nav-item"><a class="nav-link" id="tab-driver"><i class="fas fa-id-card"></i> Driver Accounts</a></li>
     </ul>
 
@@ -92,11 +92,17 @@
         </div>
     </div>
 
-    <!-- SECTION: ADD ROUTE -->
+    <!-- SECTION: ADD ROUTE / EDIT ROUTE -->
     <div id="route-section" class="tab-section d-none">
         <div class="card p-4 shadow-sm">
-            <h5 class="fw-bold mb-4 border-bottom pb-2">Add New Bus Route</h5>
+            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+                <h5 class="fw-bold mb-0" id="route-form-title">Add New Bus Route</h5>
+                <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="cancelEditBtn"><i class="fas fa-times"></i> Cancel Edit</button>
+            </div>
             <form id="routeForm">
+                <!-- Hidden ID for Edit Mode -->
+                <input type="hidden" id="editRouteId" value="">
+                
                 <div class="row mb-4">
                     <div class="col-md-4">
                         <label class="form-label small fw-bold">Bus Name</label>
@@ -142,7 +148,7 @@
                         <input type="time" id="endTime" class="form-control" required>
                     </div>
                 </div>
-                <button type="submit" class="btn btn-dark w-100 mt-4 py-2 fw-bold shadow"><i class="fas fa-save"></i> Publish Route Database</button>
+                <button type="submit" id="routeSubmitBtn" class="btn btn-dark w-100 mt-4 py-2 fw-bold shadow"><i class="fas fa-save"></i> Publish Route Database</button>
             </form>
         </div>
     </div>
@@ -168,10 +174,10 @@
 </div>
 
 <script type="module">
+    // DO NOT CHANGE CORE FIREBASE LOGIC
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, setDoc, doc, getDoc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // --- FIREBASE CONFIG (UNTOUCHED) ---
     const firebaseConfig = {
       apiKey: "AIzaSyDcWwo0m2eS1ndyC06U1G_JF1J7Y1WNlfQ",
       authDomain: "triotrack-66dd6.firebaseapp.com",
@@ -243,7 +249,7 @@
     document.getElementById('tab-route').addEventListener('click', () => switchTab('route'));
     document.getElementById('tab-driver').addEventListener('click', () => switchTab('driver'));
 
-    // --- 3. MANAGE FLEET (NEW READ/DELETE LOGIC) ---
+    // --- 3. MANAGE FLEET (READ/EDIT/DELETE) ---
     async function loadFleetData() {
         const tbody = document.getElementById('fleetTableBody');
         tbody.innerHTML = "<tr><td colspan='5' class='text-center'><i class='fas fa-spinner fa-spin'></i> Fetching from secure server...</td></tr>";
@@ -265,6 +271,9 @@
                         <td><span class="badge bg-secondary">${data.category}</span></td>
                         <td>${data.route ? data.route.length : 0} Stops</td>
                         <td>
+                            <button class="btn btn-sm btn-primary edit-btn me-1" data-id="${doc.id}" data-json='${JSON.stringify(data).replace(/'/g, "&apos;")}'>
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
                             <button class="btn btn-sm btn-danger delete-btn" data-id="${doc.id}">
                                 <i class="fas fa-trash-alt"></i> Delete
                             </button>
@@ -273,6 +282,15 @@
                 `;
             });
             tbody.innerHTML = html;
+
+            // Attach Edit Listeners (CORRECTLY ADDED EDIT FEATURE)
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.currentTarget.getAttribute('data-id');
+                    const data = JSON.parse(e.currentTarget.getAttribute('data-json'));
+                    loadRouteIntoForm(id, data);
+                });
+            });
 
             // Attach Delete Listeners
             document.querySelectorAll('.delete-btn').forEach(btn => {
@@ -292,7 +310,7 @@
     
     document.getElementById('refreshFleetBtn').addEventListener('click', loadFleetData);
 
-    // --- 4. CREATE DRIVER LOGIC (UNTOUCHED CORE) ---
+    // --- 4. CREATE DRIVER LOGIC (UNTOUCHED) ---
     document.getElementById('driverForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const busID = document.getElementById('driverBusID').value.toUpperCase().trim();
@@ -305,7 +323,7 @@
         } catch (error) { alert("Error: " + error.message); }
     });
 
-    // --- 5. SAVE ROUTE LOGIC (UNTOUCHED CORE) ---
+    // --- 5. SAVE OR UPDATE ROUTE LOGIC ---
     document.getElementById('routeForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         let stops = [];
@@ -330,13 +348,70 @@
             searchKeywords: stops.map(s => s.name.toLowerCase().trim())
         };
 
+        const editId = document.getElementById('editRouteId').value;
+
         try {
-            await addDoc(collection(db, "routes"), busData);
-            alert("Route Saved to Database Successfully!");
-            e.target.reset();
+            if (editId) {
+                // UPDATE Existing Document
+                await setDoc(doc(db, "routes", editId), busData, { merge: true });
+                alert("Route Updated Successfully!");
+                resetRouteForm();
+            } else {
+                // ADD New Document
+                await addDoc(collection(db, "routes"), busData);
+                alert("Route Saved to Database Successfully!");
+                e.target.reset();
+            }
             loadFleetData(); // Refresh fleet view
+            switchTab('fleet'); // Auto switch back to fleet tab
         } catch (err) { alert("Error saving route: " + err.message); }
     });
+
+    // Edit Function Helpers
+    function loadRouteIntoForm(id, data) {
+        switchTab('route');
+        document.getElementById('editRouteId').value = id;
+        document.getElementById('route-form-title').innerText = `Edit Route: ${data.busNumber}`;
+        document.getElementById('route-tab-title').innerText = `Edit Route`;
+        document.getElementById('routeSubmitBtn').innerHTML = `<i class="fas fa-save"></i> Update Route Database`;
+        document.getElementById('cancelEditBtn').classList.remove('d-none');
+        
+        document.getElementById('busName').value = data.busName || '';
+        document.getElementById('busNumber').value = data.busNumber || '';
+        document.getElementById('category').value = data.category || 'Private Bus';
+        
+        if (data.route && data.route.length >= 2) {
+            // Populate Start
+            document.getElementById('startPoint').value = data.route[0].name || '';
+            document.getElementById('startTime').value = data.route[0].time || '';
+            
+            // Populate End
+            const endIdx = data.route.length - 1;
+            document.getElementById('endPoint').value = data.route[endIdx].name || '';
+            document.getElementById('endTime').value = data.route[endIdx].time || '';
+            
+            // Populate Via (Mapping to the 2 intermediate slots)
+            const viaInputs = document.querySelectorAll('.stop-loc');
+            const viaTimes = document.querySelectorAll('.stop-time');
+            viaInputs.forEach(i => i.value = ""); viaTimes.forEach(i => i.value = ""); 
+            
+            for(let i=1; i < endIdx && i <= 2; i++) {
+                viaInputs[i-1].value = data.route[i].name || '';
+                viaTimes[i-1].value = data.route[i].time || '';
+            }
+        }
+    }
+
+    function resetRouteForm() {
+        document.getElementById('routeForm').reset();
+        document.getElementById('editRouteId').value = '';
+        document.getElementById('route-form-title').innerText = 'Add New Bus Route';
+        document.getElementById('route-tab-title').innerText = 'Add Route';
+        document.getElementById('routeSubmitBtn').innerHTML = `<i class="fas fa-save"></i> Publish Route Database`;
+        document.getElementById('cancelEditBtn').classList.add('d-none');
+    }
+
+    document.getElementById('cancelEditBtn').addEventListener('click', resetRouteForm);
 </script>
 </body>
 </html>
