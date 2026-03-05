@@ -59,6 +59,12 @@
         .swap-btn { border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #e9ecef; border: none; transition: 0.3s; }
         .swap-btn:hover { background: #ced4da; transform: rotate(180deg); }
         body.dark-mode .swap-btn { background: #333; color: white; }
+        
+        /* Dark Mode Text Visibility Fixes */
+        body.dark-mode .text-dark { color: #f8f9fa !important; }
+        body.dark-mode .text-muted { color: #adb5bd !important; }
+        body.dark-mode input::placeholder { color: #888 !important; }
+        body.dark-mode select { background-color: #2d2d2d; color: white; }
     </style>
 </head>
 <body>
@@ -157,7 +163,38 @@
                 <span id="selectedCategoryBadge" class="badge bg-primary fs-6">All Types</span>
             </div>
             
-            <div class="row g-3 align-items-center position-relative">
+            <!-- INSTITUTION SPECIFIC FILTERS (Hidden by default) -->
+            <div id="institutionFilters" style="display: none;" class="row g-3 mb-3 bg-light p-3 rounded border">
+                <h6 class="text-primary fw-bold mb-1"><i class="fas fa-university"></i> Campus Bus Search</h6>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted">Select District</label>
+                    <select id="instDistrict" class="form-select shadow-none">
+                        <option value="">-- Choose District --</option>
+                        <option value="Thiruvananthapuram">Thiruvananthapuram</option>
+                        <option value="Kollam">Kollam</option>
+                        <option value="Pathanamthitta">Pathanamthitta</option>
+                        <option value="Alappuzha">Alappuzha</option>
+                        <option value="Kottayam">Kottayam</option>
+                        <option value="Idukki">Idukki</option>
+                        <option value="Ernakulam">Ernakulam</option>
+                        <option value="Thrissur">Thrissur</option>
+                        <option value="Palakkad">Palakkad</option>
+                        <option value="Malappuram">Malappuram</option>
+                        <option value="Kozhikode">Kozhikode</option>
+                        <option value="Wayanad">Wayanad</option>
+                        <option value="Kannur">Kannur</option>
+                        <option value="Kasaragod">Kasaragod</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted">Polytechnic College</label>
+                    <select id="instCollege" class="form-select shadow-none" disabled>
+                        <option value="">-- Choose College --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row g-3 align-items-center position-relative" id="standardFilters">
                 <div class="col-md-5">
                     <label class="form-label small fw-bold text-muted"><i class="fas fa-map-marker-alt text-danger"></i> From</label>
                     <input type="text" id="source" class="form-control form-control-lg shadow-none" placeholder="Starting Point..." list="stopOptions">
@@ -192,6 +229,10 @@
                 <h5 class="fw-bold mb-0" id="map-title"><i class="fas fa-satellite-dish text-success pulse"></i> Live Tracking</h5>
                 <button id="closeMapBtn" class="btn btn-sm btn-danger"><i class="fas fa-times"></i> Close Map</button>
             </div>
+            <!-- Linear Tracker Status Box -->
+            <div id="linear-status-box" class="bg-primary text-white p-2 text-center fw-bold" style="font-size: 0.9rem;">
+                <i class="fas fa-location-arrow me-1"></i> <span id="linear-status-text">Locating bus on route...</span>
+            </div>
             <div id="map"></div>
         </div>
 
@@ -201,7 +242,7 @@
 </div>
 
 <footer class="text-center mt-5 py-4 text-muted small border-top">
-    <p class="mb-1">© 2024 TrioTrack Systems</p>
+    <p class="mb-1">© 2026 TrioTrack Systems</p>
     <a href="driver.html" class="text-decoration-none text-secondary"><i class="fas fa-steering-wheel"></i> Driver Portal</a>
 </footer>
 
@@ -273,6 +314,16 @@
     window.selectCategory = (category) => {
         currentCategoryFilter = category;
         document.getElementById('selectedCategoryBadge').innerText = category;
+        
+        // Toggle UI for Institution
+        if (category === 'Institution') {
+            document.getElementById('standardFilters').style.display = 'none';
+            document.getElementById('institutionFilters').style.display = 'flex';
+        } else {
+            document.getElementById('standardFilters').style.display = 'flex';
+            document.getElementById('institutionFilters').style.display = 'none';
+        }
+        
         window.navigateTo('page-search');
     };
 
@@ -320,6 +371,112 @@
     };
     loadRecentSearches();
 
+    // Institution Data Logic
+    const polytechnicData = {
+        "Palakkad": ["Govt Polytechnic College Palakkad", "Govt Polytechnic College Shoranur", "Institute of Printing Technology & GPTC Shoranur"],
+        "Ernakulam": ["Govt Polytechnic College Kalamassery", "Govt Polytechnic College Kothamangalam"],
+        "Thiruvananthapuram": ["Central Polytechnic College Vattiyoorkavu", "Govt Polytechnic College Neyyattinkara"],
+        "Kozhikode": ["Kerala Govt Polytechnic College Kozhikode", "Govt Polytechnic College Meenangadi"]
+    };
+
+    document.getElementById('instDistrict').addEventListener('change', (e) => {
+        const district = e.target.value;
+        const collegeSelect = document.getElementById('instCollege');
+        collegeSelect.innerHTML = '<option value="">-- Choose College --</option>';
+        if (polytechnicData[district]) {
+            polytechnicData[district].forEach(col => {
+                collegeSelect.innerHTML += `<option value="${col}">${col}</option>`;
+            });
+            collegeSelect.disabled = false;
+        } else {
+            collegeSelect.disabled = true;
+        }
+    });
+
+    document.getElementById('instCollege').addEventListener('change', (e) => {
+        const college = e.target.value;
+        if (!college) return;
+        
+        // Generate mock institution routes
+        const resDiv = document.getElementById('results');
+        resDiv.innerHTML = "<div class='text-center mt-4'><div class='spinner-border text-primary'></div><p class='mt-2'>Loading Campus Routes...</p></div>";
+        
+        // Route mock logic: Nearest big city to Campus
+        let city = "Main City Junction";
+        let midStop = "Highway Stop";
+        if (college.includes("Shoranur")) { city = "Pattambi"; midStop = "Kulappully"; }
+        if (college.includes("Palakkad")) { city = "Palakkad Town"; midStop = "Olavakkode"; }
+        if (college.includes("Kalamassery")) { city = "Aluva"; midStop = "Edappally"; }
+        
+        setTimeout(() => {
+            let html = `
+                <div class="alert alert-info border-0 shadow-sm"><i class="fas fa-university"></i> Campus schedules for <b>${college}</b></div>
+                
+                <!-- MORNING ROUTE -->
+                <div class="card mb-3 bus-card shadow-sm border-start border-5 border-success">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="fw-bold text-success mb-0"><i class="fas fa-bus"></i> Campus Morning Express <small class="text-muted">(BUS-M1)</small></h5>
+                            <span class="badge bg-purple" style="background-color: #6f42c1;">Institution</span>
+                        </div>
+                        <hr class="text-muted opacity-25">
+                        <div class="row align-items-center text-center">
+                            <div class="col-4 border-end">
+                                <small class="text-muted d-block"><i class="fas fa-map-marker-alt text-danger"></i> Departs</small>
+                                <strong>08:10 AM</strong><br><small>${city}</small>
+                            </div>
+                            <div class="col-4 border-end">
+                                <i class="fas fa-arrow-right text-muted"></i>
+                                <small class="d-block mt-1 text-muted">Via: ${midStop}<br>Duration: ~40m</small>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted d-block"><i class="fas fa-map-pin text-success"></i> Arrives</small>
+                                <strong>08:50 AM</strong><br><small>${college}</small>
+                            </div>
+                        </div>
+                        <div class="mt-3 pt-2 d-flex justify-content-between">
+                            <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Morning Express', 'BUS-M1', '08:10 AM')"><i class="fas fa-share-alt"></i> Share</button>
+                            <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="BUS-M1"><i class="fas fa-satellite-dish"></i> Track Live</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- EVENING ROUTE -->
+                <div class="card mb-3 bus-card shadow-sm border-start border-5 border-warning">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="fw-bold text-warning mb-0"><i class="fas fa-bus"></i> Campus Evening Return <small class="text-muted">(BUS-E1)</small></h5>
+                            <span class="badge bg-purple" style="background-color: #6f42c1;">Institution</span>
+                        </div>
+                        <hr class="text-muted opacity-25">
+                        <div class="row align-items-center text-center">
+                            <div class="col-4 border-end">
+                                <small class="text-muted d-block"><i class="fas fa-map-marker-alt text-danger"></i> Departs</small>
+                                <strong>04:10 PM</strong><br><small>${college}</small>
+                            </div>
+                            <div class="col-4 border-end">
+                                <i class="fas fa-arrow-right text-muted"></i>
+                                <small class="d-block mt-1 text-muted">Via: ${midStop}<br>Duration: ~40m</small>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted d-block"><i class="fas fa-map-pin text-success"></i> Arrives</small>
+                                <strong>04:50 PM</strong><br><small>${city}</small>
+                            </div>
+                        </div>
+                        <div class="mt-3 pt-2 d-flex justify-content-between">
+                            <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Evening Return', 'BUS-E1', '04:10 PM')"><i class="fas fa-share-alt"></i> Share</button>
+                            <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="BUS-E1"><i class="fas fa-satellite-dish"></i> Track Live</button>
+                        </div>
+                    </div>
+                </div>`;
+            resDiv.innerHTML = html;
+            
+            document.querySelectorAll('.track-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => track(e.target.getAttribute('data-bus')));
+            });
+        }, 600);
+    });
+
     // Share feature
     window.shareBus = async (busName, busNum, time) => {
         const shareData = {
@@ -328,10 +485,12 @@
             url: window.location.href
         };
         try {
-            if (navigator.share) await navigator.share(shareData);
-            else {
-                navigator.clipboard.writeText(shareData.text);
-                alert("Bus details copied to clipboard!");
+            if (navigator.share) {
+                await navigator.share(shareData);
+            } else {
+                // Fallback to direct WhatsApp open if native share fails/unavailable
+                const waUrl = `https://wa.me/?text=${encodeURIComponent(shareData.text + " Link: " + shareData.url)}`;
+                window.open(waUrl, '_blank');
             }
         } catch (err) { console.error('Error sharing:', err); }
     };
@@ -366,6 +525,8 @@
 
     // 2. Search Logic
     document.getElementById('searchBtn').addEventListener('click', () => {
+        if (currentCategoryFilter === 'Institution') return; // Handled by dropdowns
+
         const src = document.getElementById('source').value.toLowerCase().trim();
         const dst = document.getElementById('destination').value.toLowerCase().trim();
         const resDiv = document.getElementById('results');
@@ -434,11 +595,25 @@
         });
     });
 
-    // Helper: Dummy duration calculator
+    // Duration calculator (Real Time Parsing)
     function calculateDuration(t1, t2) {
-        if(t1==="N/A" || t2==="N/A") return "--";
-        // Simple string parsing just for visual effect if valid format
-        return "ETA"; 
+        if(t1==="N/A" || t2==="N/A" || !t1 || !t2) return "--";
+        try {
+            // Convert standard HH:MM formats
+            let d1 = new Date(`1970-01-01T${t1.padStart(5, '0')}:00`);
+            let d2 = new Date(`1970-01-01T${t2.padStart(5, '0')}:00`);
+            
+            if (isNaN(d1) || isNaN(d2)) return "ETA";
+            
+            if(d2 < d1) d2.setDate(d2.getDate() + 1); // Crosses midnight
+            let diffMins = Math.round((d2 - d1) / 60000);
+            
+            let h = Math.floor(diffMins / 60);
+            let m = diffMins % 60;
+            return h > 0 ? `${h}h ${m}m` : `${m}m`;
+        } catch(e) {
+            return "ETA"; 
+        }
     }
 
     // 3. Tracking Logic (Leaflet + Firebase)
@@ -446,18 +621,24 @@
         const mapDiv = document.getElementById('map-container');
         mapDiv.style.display = 'block';
         document.getElementById('map-title').innerHTML = `<i class="fas fa-satellite-dish text-success pulse"></i> Tracking: ${busNum}`;
+        document.getElementById('linear-status-text').innerText = "Connecting to GPS Satellite...";
         mapDiv.scrollIntoView({ behavior: 'smooth' });
 
         if (!map) {
             map = L.map('map').setView([10.0, 76.0], 10);
             
-            // Multiple Layers
+            // Multiple Layers (Including Hybrid Satellite with Place Names/Roads)
             const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
-            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community' });
+            
+            // Using Google Hybrid layer for rich satellite with place names and roads
+            const hybridLayer = L.tileLayer('http://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}', { 
+                attribution: '© Google Hybrid Map',
+                maxZoom: 20
+            });
             
             streetLayer.addTo(map); // Default
             
-            const baseMaps = { "Street View": streetLayer, "Satellite View": satelliteLayer };
+            const baseMaps = { "Street View": streetLayer, "Hybrid Satellite View": hybridLayer };
             L.control.layers(baseMaps).addTo(map);
         }
         
@@ -483,10 +664,32 @@
                     marker = L.marker([lat, lng], {icon: busIcon}).addTo(map).bindPopup(`<b>🚌 Bus ${busNum}</b><br>Live Location`).openPopup();
                 }
                 map.setView([lat, lng], 15);
+                
+                // Linear Tracking Logic (Estimating nearest logical location)
+                updateLinearTracker(lat, lng, busNum);
+
             } else { 
                 alert("GPS Signal Lost: This bus is currently offline or not broadcasting its location.");
+                document.getElementById('linear-status-text').innerText = "Bus Offline.";
             }
         });
+    }
+
+    // Linear Tracking Simulator
+    function updateLinearTracker(lat, lng, busNum) {
+        const statusText = document.getElementById('linear-status-text');
+        
+        // Mock distance check (in a real scenario, this calculates distance to the coordinates of the next stop)
+        // Providing local context based on requested scenario
+        let locationName = "the main route";
+        
+        // Mock geographical bounding boxes for Palakkad context as requested by user
+        if (lat > 10.75 && lat < 10.85 && lng > 76.15 && lng < 76.25) locationName = "Shoranur / Kulappully area";
+        else if (lat > 10.77 && lat < 10.80 && lng > 76.25 && lng < 76.30) locationName = "Koonathra area";
+        else if (lat > 10.75 && lat < 10.80 && lng > 76.60 && lng < 76.70) locationName = "Palakkad Town";
+        else if (lat > 10.00 && lat < 10.10 && lng > 76.30 && lng < 76.40) locationName = "Kalamassery Campus area";
+        
+        statusText.innerText = `Bus ${busNum} is currently traversing near ${locationName}.`;
     }
 
     // Close Map
