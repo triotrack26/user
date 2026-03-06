@@ -67,7 +67,7 @@
         body.dark-mode select { background-color: #2d2d2d; color: white; }
         body.dark-mode .alert-info { background-color: #0c5460; color: #d1ecf1; border-color: #0c5460; }
         
-        /* AI Modal Styles */
+        /* Modal Styles */
         body.dark-mode .modal-content { background-color: var(--card-dark); color: var(--text-dark); }
         body.dark-mode .modal-header { border-bottom-color: #333; }
         body.dark-mode .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
@@ -238,8 +238,8 @@
             </div>
             <!-- Dynamic Linear Tracker Status Box -->
             <div id="linear-status-box" class="bg-primary text-white p-2" style="font-size: 0.95rem; border-bottom: 2px solid #0056b3;">
-                <div class="d-flex flex-column align-items-center">
-                    <div class="fw-bold mb-1"><i class="fas fa-map-marker-alt text-warning"></i> Current Location: <span id="current-location-text" class="text-light">Detecting...</span></div>
+                <div class="d-flex flex-column align-items-center text-center">
+                    <div class="fw-bold mb-1"><i class="fas fa-map-marker-alt text-warning"></i> Current Location: <br><span id="current-location-text" class="text-light">Detecting GPS Area...</span></div>
                     <div class="fw-bold"><i class="fas fa-arrow-circle-right text-info"></i> Next Stop: <span id="next-stop-text" class="text-light">Calculating...</span></div>
                 </div>
             </div>
@@ -715,7 +715,7 @@
                 }
                 map.setView([lat, lng], 15);
                 
-                // Trigger advanced dynamic linear tracking
+                // Trigger advanced dynamic linear tracking using API
                 updateLinearTracker(lat, lng, busNum);
             } else { 
                 alert("GPS Signal Lost: This bus is currently offline or not broadcasting its location.");
@@ -725,64 +725,72 @@
         });
     }
 
-    // Helper: Approximate location based on lat/lng in Kerala
-    function getApproximateLocation(lat, lng) {
-        let place = "Unknown Nearest Place";
-        if (lat > 10.75 && lat < 10.85 && lng > 76.15 && lng < 76.25) place = "Kulappully / Shoranur Zone";
-        else if (lat > 10.77 && lat < 10.80 && lng > 76.25 && lng < 76.30) place = "Koonathra Area";
-        else if (lat > 10.75 && lat < 10.80 && lng > 76.60 && lng < 76.70) place = "Palakkad Town";
-        else if (lat > 9.90 && lat < 10.10 && lng > 76.20 && lng < 76.40) place = "Ernakulam / Kochi Zone";
-        else if (lat > 8.40 && lat < 8.60 && lng > 76.80 && lng < 77.00) place = "Thiruvananthapuram Zone";
-        else if (lat > 11.20 && lat < 11.40 && lng > 75.70 && lng < 75.90) place = "Kozhikode Zone";
-        else if (lat > 11.80 && lat < 12.00 && lng > 75.30 && lng < 75.50) place = "Kannur Zone";
-        else place = "On Route";
-        
-        return `Nearest Place: ${place} | GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    }
-
-    // Dynamic Linear Tracking Method (Distance/Time Hybrid Logic)
+    // Dynamic Linear Tracking Method using API Reverse Geocoding & Route Comparison
     function updateLinearTracker(lat, lng, busNum) {
         const currentLocText = document.getElementById('current-location-text');
         const nextStopText = document.getElementById('next-stop-text');
-        
-        // 1. Set current location based on GPS coords
-        currentLocText.innerText = getApproximateLocation(lat, lng);
-
         const busData = allRoutesData.find(b => b.busNumber === busNum);
-        let nextStopName = "Unknown";
-        
-        // 2. Calculate next stop dynamically based on current time traversing the route
-        if (busData && busData.route && busData.route.length > 0) {
-            const now = new Date();
-            const currentMins = now.getHours() * 60 + now.getMinutes();
-            
-            for (let i = 0; i < busData.route.length; i++) {
-                let stopTime = busData.route[i].time;
-                if(stopTime && stopTime !== "N/A") {
-                    let isPM = stopTime.includes('PM');
-                    let timeParts = stopTime.replace(/(AM|PM)/i, '').trim().split(':');
-                    let hrs = parseInt(timeParts[0]);
-                    let mins = parseInt(timeParts[1]);
-                    if (isPM && hrs < 12) hrs += 12;
-                    if (!isPM && hrs === 12) hrs = 0;
-                    
-                    let stopMins = hrs * 60 + mins;
-                    
-                    if (currentMins < stopMins) {
-                        nextStopName = `${busData.route[i].name} (ETA: ${stopTime})`;
-                        break;
+
+        // Fetch real-time place name using OpenStreetMap Nominatim API
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`)
+            .then(res => res.json())
+            .then(data => {
+                let placeName = data.name || data.address?.city || data.address?.town || data.address?.village || data.address?.suburb || "Unknown Place";
+                currentLocText.innerHTML = `${placeName} <br><small class="text-muted" style="font-size:0.75rem;">GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`;
+                
+                let nextStopName = "Calculating...";
+                
+                if (busData && busData.route && busData.route.length > 0) {
+                    // 1. Location-based matching: Check if current place matches any route stop
+                    let foundIndex = -1;
+                    let placeNameLower = placeName.toLowerCase();
+                    for (let i = 0; i < busData.route.length; i++) {
+                        if (placeNameLower.includes(busData.route[i].name.toLowerCase()) || busData.route[i].name.toLowerCase().includes(placeNameLower)) {
+                            foundIndex = i;
+                            break;
+                        }
                     }
+                    
+                    if (foundIndex !== -1 && foundIndex < busData.route.length - 1) {
+                        nextStopName = `${busData.route[foundIndex + 1].name} (Based on current area)`;
+                    } else {
+                        // 2. Schedule Fallback logic if area doesn't exactly match a stop name
+                        const now = new Date();
+                        const currentMins = now.getHours() * 60 + now.getMinutes();
+                        
+                        for (let i = 0; i < busData.route.length; i++) {
+                            let stopTime = busData.route[i].time;
+                            if(stopTime && stopTime !== "N/A") {
+                                let isPM = stopTime.includes('PM');
+                                let timeParts = stopTime.replace(/(AM|PM)/i, '').trim().split(':');
+                                let hrs = parseInt(timeParts[0]);
+                                let mins = parseInt(timeParts[1]);
+                                if (isPM && hrs < 12) hrs += 12;
+                                if (!isPM && hrs === 12) hrs = 0;
+                                
+                                let stopMins = hrs * 60 + mins;
+                                
+                                if (currentMins < stopMins) {
+                                    nextStopName = `${busData.route[i].name} (ETA: ${stopTime})`;
+                                    break;
+                                }
+                            }
+                        }
+                        if (nextStopName === "Calculating...") nextStopName = `${busData.route[busData.route.length - 1].name} (Final Destination)`;
+                    }
+                } else {
+                    // Fallback for Institutional Mock Routes
+                    if(busNum === "BUS-M1") nextStopName = "College Campus (ETA: 08:50 AM)";
+                    else if(busNum === "BUS-E1") nextStopName = "District Headquarters (ETA: 04:50 PM)";
+                    else nextStopName = "Tracking active...";
                 }
-            }
-            if (nextStopName === "Unknown") nextStopName = `${busData.route[busData.route.length - 1].name} (Final Destination)`;
-        } else {
-            // Geographic Fallback for Institutional Mock Routes
-            if(busNum === "BUS-M1") nextStopName = "College Campus (ETA: 08:50 AM)";
-            else if(busNum === "BUS-E1") nextStopName = "District Headquarters (ETA: 04:50 PM)";
-            else nextStopName = "Tracking active...";
-        }
-        
-        nextStopText.innerText = nextStopName;
+                
+                nextStopText.innerText = nextStopName;
+            })
+            .catch(err => {
+                currentLocText.innerHTML = `Area Unavailable <br><small class="text-muted" style="font-size:0.75rem;">GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`;
+                nextStopText.innerText = "Location tracking...";
+            });
     }
 
     // Close Map
