@@ -231,8 +231,11 @@
                 <button id="closeMapBtn" class="btn btn-sm btn-danger"><i class="fas fa-times"></i> Close Map</button>
             </div>
             <!-- Dynamic Linear Tracker Status Box -->
-            <div id="linear-status-box" class="bg-primary text-white p-3 text-center" style="font-size: 1.05rem; border-bottom: 2px solid #0056b3;">
-                <i class="fas fa-location-arrow me-1 pulse"></i> <span id="linear-status-text" class="fw-bold">Establishing satellite lock...</span>
+            <div id="linear-status-box" class="bg-primary text-white p-2" style="font-size: 0.95rem; border-bottom: 2px solid #0056b3;">
+                <div class="d-flex flex-column align-items-center">
+                    <div class="fw-bold mb-1"><i class="fas fa-map-marker-alt text-warning"></i> Current Location: <span id="current-location-text" class="text-light">Detecting...</span></div>
+                    <div class="fw-bold"><i class="fas fa-arrow-circle-right text-info"></i> Next Stop: <span id="next-stop-text" class="text-light">Calculating...</span></div>
+                </div>
             </div>
             <div id="map"></div>
         </div>
@@ -243,7 +246,7 @@
 </div>
 
 <footer class="text-center mt-5 py-4 text-muted small border-top">
-    <p class="mb-1 fw-bold">© 2026 TrioTrack </p>
+    <p class="mb-1 fw-bold">© 2026 TrioTrack Systems</p>
 </footer>
 
 <!-- SCRIPTS -->
@@ -404,19 +407,38 @@
 
     document.getElementById('instCollege').addEventListener('change', (e) => {
         const college = e.target.value;
+        const district = document.getElementById('instDistrict').value;
         if (!college) return;
         
         const resDiv = document.getElementById('results');
         resDiv.innerHTML = "<div class='text-center mt-4'><div class='spinner-border text-primary'></div><p class='mt-2 text-dark'>Fetching Campus Routes...</p></div>";
         
-        // Mock Realistic Distances & Stops for Colleges
+        // Define specific distinct routes based on the selected District
         let city = "District Headquarters";
         let midStop = "Main Highway Junction";
-        if (college.includes("Shoranur")) { city = "Pattambi"; midStop = "Kulappully"; }
-        else if (college.includes("Palakkad")) { city = "Palakkad Town"; midStop = "Olavakkode"; }
-        else if (college.includes("Kalamassery")) { city = "Aluva"; midStop = "Edappally"; }
-        else if (college.includes("Vattiyoorkavu")) { city = "Thampanoor"; midStop = "PPM Junction"; }
-        else if (college.includes("Kozhikode")) { city = "Calicut City"; midStop = "Nadakkavu"; }
+        
+        switch(district) {
+            case "Thiruvananthapuram": city = "Thampanoor Bus Station"; midStop = "Karamana - Pappanamcode"; break;
+            case "Kollam": city = "Kollam KSRTC Stand"; midStop = "Chinnakada - Kundara"; break;
+            case "Pathanamthitta": city = "Adoor Central"; midStop = "Pandalam - MC Road"; break;
+            case "Alappuzha": city = "Alappuzha KSRTC"; midStop = "Ambalappuzha Bypass"; break;
+            case "Kottayam": city = "Kottayam Thirunakkara"; midStop = "Ettumanoor Temple Route"; break;
+            case "Idukki": city = "Thodupuzha Town"; midStop = "Muttom - Vagamon Route"; break;
+            case "Ernakulam": city = "Ernakulam South"; midStop = "Vyttila - Edappally"; break;
+            case "Thrissur": city = "Thrissur Sakthan Stand"; midStop = "Punkunnam - Wadakkanchery"; break;
+            case "Palakkad": city = "Palakkad Stadium Stand"; midStop = "Olavakkode - Ottapalam"; break;
+            case "Malappuram": city = "Malappuram Down Hill"; midStop = "Kottakkal Ayurveda Junction"; break;
+            case "Kozhikode": city = "Kozhikode Moffusil Stand"; midStop = "Nadakkavu - West Hill"; break;
+            case "Wayanad": city = "Kalpetta Town"; midStop = "Vythiri - Meenangadi"; break;
+            case "Kannur": city = "Kannur Caltex"; midStop = "Thalassery - Mattannur"; break;
+            case "Kasaragod": city = "Kasaragod New Stand"; midStop = "Kanhangad South"; break;
+        }
+
+        // Additional Specific College Overrides (for even finer detail based on name)
+        if (college.includes("Shoranur")) { city = "Pattambi Stand"; midStop = "Kulappully Highway"; }
+        else if (college.includes("Kalamassery")) { city = "Aluva KSRTC"; midStop = "CUSAT Junction"; }
+        else if (college.includes("Meenangadi")) { city = "Sulthan Bathery"; midStop = "Kolagappara"; }
+        else if (college.includes("Adoor")) { city = "Pathanamthitta Town"; midStop = "Omalloor"; }
         
         setTimeout(() => {
             let html = `
@@ -474,7 +496,7 @@
                             </div>
                         </div>
                         <div class="mt-3 pt-2 d-flex justify-content-between">
-                            <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Evening Return', 'BUS-E1', '04:10 PM')"><i class="fas fa-share-alt"></i> Share to WhatsApp</button>
+                            <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Evening Return', 'BUS-E1', '04:10 PM')"><i class="fas fa-share-alt"></i> Share</button>
                             <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="BUS-E1"><i class="fas fa-satellite-dish"></i> Track Live</button>
                         </div>
                     </div>
@@ -590,7 +612,7 @@
                                 </div>
                             </div>
                             <div class="mt-3 pt-2 d-flex justify-content-between">
-                                <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('${d.busName}', '${d.busNumber}', '${t1}')"><i class="fas fa-share-alt"></i> Share to WhatsApp</button>
+                                <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('${d.busName}', '${d.busNumber}', '${t1}')"><i class="fas fa-share-alt"></i> Share</button>
                                 <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="${d.busNumber}"><i class="fas fa-satellite-dish"></i> Track Live</button>
                             </div>
                         </div>
@@ -683,23 +705,39 @@
                 updateLinearTracker(lat, lng, busNum);
             } else { 
                 alert("GPS Signal Lost: This bus is currently offline or not broadcasting its location.");
-                document.getElementById('linear-status-text').innerText = "Bus Offline.";
+                document.getElementById('current-location-text').innerText = "Bus Offline.";
+                document.getElementById('next-stop-text').innerText = "Unknown";
             }
         });
     }
 
+    // Helper: Approximate location based on lat/lng in Kerala
+    function getApproximateLocation(lat, lng) {
+        if (lat > 10.75 && lat < 10.85 && lng > 76.15 && lng < 76.25) return "Kulappully / Shoranur Zone";
+        if (lat > 10.77 && lat < 10.80 && lng > 76.25 && lng < 76.30) return "Koonathra Area";
+        if (lat > 10.75 && lat < 10.80 && lng > 76.60 && lng < 76.70) return "Palakkad Town";
+        if (lat > 9.90 && lat < 10.10 && lng > 76.20 && lng < 76.40) return "Ernakulam / Kochi Zone";
+        if (lat > 8.40 && lat < 8.60 && lng > 76.80 && lng < 77.00) return "Thiruvananthapuram Zone";
+        if (lat > 11.20 && lat < 11.40 && lng > 75.70 && lng < 75.90) return "Kozhikode Zone";
+        if (lat > 11.80 && lat < 12.00 && lng > 75.30 && lng < 75.50) return "Kannur Zone";
+        return `GPS Point: ${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+    }
+
     // Dynamic Linear Tracking Method (Distance/Time Hybrid Logic)
     function updateLinearTracker(lat, lng, busNum) {
-        const statusText = document.getElementById('linear-status-text');
-        const busData = allRoutesData.find(b => b.busNumber === busNum);
+        const currentLocText = document.getElementById('current-location-text');
+        const nextStopText = document.getElementById('next-stop-text');
         
-        // If we have actual route data, calculate the linear position dynamically based on schedule
+        // 1. Set current location based on GPS coords
+        currentLocText.innerText = getApproximateLocation(lat, lng);
+
+        const busData = allRoutesData.find(b => b.busNumber === busNum);
+        let nextStopName = "Unknown";
+        
+        // 2. Calculate next stop dynamically based on current time traversing the route
         if (busData && busData.route && busData.route.length > 0) {
             const now = new Date();
             const currentMins = now.getHours() * 60 + now.getMinutes();
-            
-            let prevStop = busData.route[0];
-            let nextStop = busData.route[busData.route.length - 1];
             
             for (let i = 0; i < busData.route.length; i++) {
                 let stopTime = busData.route[i].time;
@@ -714,29 +752,20 @@
                     let stopMins = hrs * 60 + mins;
                     
                     if (currentMins < stopMins) {
-                        nextStop = busData.route[i];
-                        prevStop = i > 0 ? busData.route[i-1] : busData.route[0];
+                        nextStopName = `${busData.route[i].name} (ETA: ${stopTime})`;
                         break;
-                    } else {
-                        prevStop = busData.route[i];
                     }
                 }
             }
-            
-            if (prevStop.name === nextStop.name) {
-               statusText.innerHTML = `Bus ${busNum} is arriving at or stationed at <b>${nextStop.name}</b>`;
-            } else {
-               statusText.innerHTML = `Bus ${busNum} passed <b>${prevStop.name}</b>, next stop: <b>${nextStop.name}</b> (~2 to 5km)`;
-            }
+            if (nextStopName === "Unknown") nextStopName = `${busData.route[busData.route.length - 1].name} (Final Destination)`;
         } else {
-            // Geographic Fallback method if bus data not in route array (Mock Geofences for Kerala)
-            let locationName = "active route";
-            if (lat > 10.75 && lat < 10.85 && lng > 76.15 && lng < 76.25) locationName = "Kulappully / Shoranur zone (Within 2-5km)";
-            else if (lat > 10.77 && lat < 10.80 && lng > 76.25 && lng < 76.30) locationName = "Koonathra stop (Within 2-5km)";
-            else if (lat > 10.75 && lat < 10.80 && lng > 76.60 && lng < 76.70) locationName = "Palakkad Town";
-            
-            statusText.innerText = `Bus ${busNum} is moving near ${locationName}.`;
+            // Geographic Fallback for Institutional Mock Routes
+            if(busNum === "BUS-M1") nextStopName = "College Campus (ETA: 08:50 AM)";
+            else if(busNum === "BUS-E1") nextStopName = "District Headquarters (ETA: 04:50 PM)";
+            else nextStopName = "Tracking active...";
         }
+        
+        nextStopText.innerText = nextStopName;
     }
 
     // Close Map
