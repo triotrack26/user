@@ -805,13 +805,21 @@
     }
 
     // Refresh Map
-    document.getElementById('refreshMapBtn').addEventListener('click', () => {
+    document.getElementById('refreshMapBtn').addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<i class="fas fa-sync-alt fa-spin"></i> Refreshing...`;
+        
         if (map) {
-            map.invalidateSize();
+            map.invalidateSize(true);
             if (marker) {
-                map.setView(marker.getLatLng(), 15);
+                map.setView(marker.getLatLng(), 15, { animate: true });
             }
         }
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+        }, 800);
     });
 
     // Close Map
