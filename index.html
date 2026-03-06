@@ -66,6 +66,11 @@
         body.dark-mode input::placeholder { color: #888 !important; }
         body.dark-mode select { background-color: #2d2d2d; color: white; }
         body.dark-mode .alert-info { background-color: #0c5460; color: #d1ecf1; border-color: #0c5460; }
+        
+        /* AI Modal Styles */
+        body.dark-mode .modal-content { background-color: var(--card-dark); color: var(--text-dark); }
+        body.dark-mode .modal-header { border-bottom-color: #333; }
+        body.dark-mode .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
     </style>
 </head>
 <body>
@@ -216,6 +221,18 @@
                     <button id="searchBtn" class="btn btn-dark btn-lg px-5 w-100 shadow"><i class="fas fa-search"></i> Search Route</button>
                 </div>
             </div>
+            
+            <!-- ✨ AI SMART SEARCH -->
+            <div class="mt-4 pt-3 border-top position-relative" id="aiSearchContainer">
+                <span class="position-absolute top-0 start-50 translate-middle px-2 text-muted small fw-bold" style="background-color: var(--card-light);" id="orBadge">OR</span>
+                <label class="form-label small fw-bold text-primary mt-2"><i class="fas fa-magic"></i> ✨ AI Smart Search</label>
+                <div class="input-group shadow-sm">
+                    <input type="text" id="aiSearchInput" class="form-control shadow-none border-primary" placeholder="E.g., Find me a KSRTC bus from Palakkad to Thrissur">
+                    <button id="aiSearchBtn" class="btn btn-primary fw-bold px-3">Ask ✨</button>
+                </div>
+                <small id="aiSearchStatus" class="form-text text-muted mt-1 d-block"></small>
+            </div>
+
             <datalist id="stopOptions"></datalist>
 
             <div class="mt-4" id="recentSearchesContainer" style="display: none;">
@@ -245,15 +262,137 @@
 
 </div>
 
+<!-- ✨ AI INSIGHTS MODAL -->
+<div class="modal fade" id="aiInsightModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold text-primary"><i class="fas fa-magic"></i> ✨ AI Route Insights</h5>
+        <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center py-4">
+         <div id="aiInsightLoading" style="display:none;">
+             <div class="spinner-border text-primary" role="status"></div>
+             <p class="mt-3 fw-bold text-muted">Consulting Gemini AI...</p>
+         </div>
+         <div id="aiInsightContent" class="fs-5 text-dark" style="line-height: 1.6;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <footer class="text-center mt-5 py-4 text-muted small border-top">
     <p class="mb-1 fw-bold">© 2026 TrioTrack Systems</p>
 </footer>
 
 <!-- SCRIPTS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, getDocs, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // --- GEMINI API CONFIGURATION ---
+    const apiKey = ""; // Execution environment provides the API key at runtime
+
+    // Exponential Backoff for Gemini Calls
+    async function callGeminiAPI(prompt, isJson = false) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+        const payload = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7 }
+        };
+        
+        if (isJson) {
+            payload.generationConfig.responseMimeType = "application/json";
+            payload.generationConfig.responseSchema = {
+                type: "OBJECT",
+                properties: {
+                    source: {type: "STRING"},
+                    destination: {type: "STRING"},
+                    category: {type: "STRING"}
+                },
+                required: ["source", "destination"]
+            };
+        }
+
+        let retries = 5;
+        let delay = 1000;
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                return data.candidates[0].content.parts[0].text;
+            } catch (e) {
+                if (i === retries - 1) throw e;
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2;
+            }
+        }
+    }
+
+    // ✨ AI Smart Search Handler
+    document.getElementById('aiSearchBtn').addEventListener('click', async () => {
+        const input = document.getElementById('aiSearchInput').value;
+        if (!input) return;
+        
+        const status = document.getElementById('aiSearchStatus');
+        status.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ✨ AI is analyzing your request...`;
+        
+        try {
+            const prompt = `Extract the starting city (source), destination city, and bus category from this travel request: "${input}". The category must be mapped to one of these EXACT strings: 'Private Bus', 'Public Bus (KSRTC)', 'Interstate', or 'All'. If you are unsure about the category, use 'All'.`;
+            
+            const resultText = await callGeminiAPI(prompt, true);
+            const json = JSON.parse(resultText);
+            
+            if (json.source) document.getElementById('source').value = json.source;
+            if (json.destination) document.getElementById('destination').value = json.destination;
+            
+            if (json.category && json.category !== 'All' && json.category !== 'Institution') {
+                window.selectCategory(json.category);
+            } else {
+                window.selectCategory('All');
+            }
+            
+            status.innerHTML = `<i class="fas fa-check text-success"></i> ✨ Got it! Searching for routes from ${json.source || 'Unknown'} to ${json.destination || 'Unknown'}...`;
+            
+            setTimeout(() => {
+                document.getElementById('searchBtn').click();
+                status.innerText = "";
+            }, 1000);
+            
+        } catch(err) {
+            status.innerHTML = `<i class="fas fa-exclamation-triangle text-danger"></i> ✨ AI failed to parse request. Please use manual search.`;
+        }
+    });
+
+    // ✨ AI Route Insights Handler
+    window.fetchRouteInsight = async (src, dst) => {
+        const modal = new bootstrap.Modal(document.getElementById('aiInsightModal'));
+        modal.show();
+        
+        document.getElementById('aiInsightContent').style.display = 'none';
+        document.getElementById('aiInsightLoading').style.display = 'block';
+        
+        try {
+            const prompt = `Give me a quick, fascinating 2-sentence travel tip, cultural fact, or scenic highlight about traveling between ${src} and ${dst} in Kerala, India. Keep it engaging and helpful for a bus traveler.`;
+            const insight = await callGeminiAPI(prompt, false);
+            
+            document.getElementById('aiInsightLoading').style.display = 'none';
+            document.getElementById('aiInsightContent').style.display = 'block';
+            document.getElementById('aiInsightContent').innerText = insight;
+        } catch(err) {
+            document.getElementById('aiInsightLoading').style.display = 'none';
+            document.getElementById('aiInsightContent').style.display = 'block';
+            document.getElementById('aiInsightContent').innerHTML = `<span class="text-danger">Unable to load AI insights at the moment. Enjoy your trip!</span>`;
+        }
+    };
+
 
     // --- FIREBASE CONFIG (UNTOUCHED) ---
     const firebaseConfig = {
@@ -290,6 +429,7 @@
         document.body.classList.toggle('dark-mode');
         const isDark = document.body.classList.contains('dark-mode');
         document.getElementById('themeToggleBtn').innerHTML = isDark ? '<i class="fas fa-sun"></i> Light' : '<i class="fas fa-moon"></i> Dark';
+        document.getElementById('orBadge').style.backgroundColor = isDark ? 'var(--card-dark)' : 'var(--card-light)';
     });
 
     // SPA Navigation Hooks
@@ -319,12 +459,14 @@
         currentCategoryFilter = category;
         document.getElementById('selectedCategoryBadge').innerText = category;
         
-        // Toggle UI for Institution
+        // Toggle UI for Institution & AI Search
         if (category === 'Institution') {
             document.getElementById('standardFilters').style.display = 'none';
+            document.getElementById('aiSearchContainer').style.display = 'none';
             document.getElementById('institutionFilters').style.display = 'flex';
         } else {
             document.getElementById('standardFilters').style.display = 'flex';
+            document.getElementById('aiSearchContainer').style.display = 'block';
             document.getElementById('institutionFilters').style.display = 'none';
         }
         
@@ -466,8 +608,11 @@
                                 <strong>08:50 AM</strong><br><small>${college}</small>
                             </div>
                         </div>
-                        <div class="mt-3 pt-2 d-flex justify-content-between">
-                            <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Morning Express', 'BUS-M1', '08:10 AM')"><i class="fas fa-share-alt"></i> Share</button>
+                        <div class="mt-3 pt-2 d-flex justify-content-between align-items-center">
+                            <div>
+                                <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Morning Express', 'BUS-M1', '08:10 AM')"><i class="fas fa-share-alt"></i> Share</button>
+                                <button class="btn btn-outline-info btn-sm fw-bold ms-1" onclick="window.fetchRouteInsight('${city}', '${college}')">✨ AI Insights</button>
+                            </div>
                             <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="BUS-M1"><i class="fas fa-satellite-dish"></i> Track Live</button>
                         </div>
                     </div>
@@ -495,8 +640,11 @@
                                 <strong>04:50 PM</strong><br><small>${city}</small>
                             </div>
                         </div>
-                        <div class="mt-3 pt-2 d-flex justify-content-between">
-                            <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Evening Return', 'BUS-E1', '04:10 PM')"><i class="fas fa-share-alt"></i> Share</button>
+                        <div class="mt-3 pt-2 d-flex justify-content-between align-items-center">
+                            <div>
+                                <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Evening Return', 'BUS-E1', '04:10 PM')"><i class="fas fa-share-alt"></i> Share</button>
+                                <button class="btn btn-outline-info btn-sm fw-bold ms-1" onclick="window.fetchRouteInsight('${college}', '${city}')">✨ AI Insights</button>
+                            </div>
                             <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="BUS-E1"><i class="fas fa-satellite-dish"></i> Track Live</button>
                         </div>
                     </div>
@@ -611,8 +759,11 @@
                                     <small>${t2Obj.name}</small>
                                 </div>
                             </div>
-                            <div class="mt-3 pt-2 d-flex justify-content-between">
-                                <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('${d.busName}', '${d.busNumber}', '${t1}')"><i class="fas fa-share-alt"></i> Share</button>
+                            <div class="mt-3 pt-2 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('${d.busName}', '${d.busNumber}', '${t1}')"><i class="fas fa-share-alt"></i> Share</button>
+                                    <button class="btn btn-outline-info btn-sm fw-bold ms-1" onclick="window.fetchRouteInsight('${t1Obj.name}', '${t2Obj.name}')">✨ AI Insights</button>
+                                </div>
                                 <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="${d.busNumber}"><i class="fas fa-satellite-dish"></i> Track Live</button>
                             </div>
                         </div>
@@ -657,7 +808,8 @@
         const mapDiv = document.getElementById('map-container');
         mapDiv.style.display = 'block';
         document.getElementById('map-title').innerHTML = `<i class="fas fa-satellite-dish text-success pulse"></i> Tracking: ${busNum}`;
-        document.getElementById('linear-status-text').innerText = "Connecting to GPS Satellite...";
+        document.getElementById('current-location-text').innerText = "Connecting to GPS...";
+        document.getElementById('next-stop-text').innerText = "Calculating...";
         mapDiv.scrollIntoView({ behavior: 'smooth' });
 
         if (!map) {
