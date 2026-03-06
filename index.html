@@ -262,25 +262,6 @@
 
 </div>
 
-<!-- ✨ AI INSIGHTS MODAL -->
-<div class="modal fade" id="aiInsightModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header border-0 pb-0">
-        <h5 class="modal-title fw-bold text-primary"><i class="fas fa-magic"></i> ✨ AI Route Insights</h5>
-        <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body text-center py-4">
-         <div id="aiInsightLoading" style="display:none;">
-             <div class="spinner-border text-primary" role="status"></div>
-             <p class="mt-3 fw-bold text-muted">Consulting Gemini AI...</p>
-         </div>
-         <div id="aiInsightContent" class="fs-5 text-dark" style="line-height: 1.6;"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <footer class="text-center mt-5 py-4 text-muted small border-top">
     <p class="mb-1 fw-bold">© 2026 TrioTrack Systems</p>
 </footer>
@@ -370,29 +351,6 @@
             status.innerHTML = `<i class="fas fa-exclamation-triangle text-danger"></i> ✨ AI failed to parse request. Please use manual search.`;
         }
     });
-
-    // ✨ AI Route Insights Handler
-    window.fetchRouteInsight = async (src, dst) => {
-        const modal = new bootstrap.Modal(document.getElementById('aiInsightModal'));
-        modal.show();
-        
-        document.getElementById('aiInsightContent').style.display = 'none';
-        document.getElementById('aiInsightLoading').style.display = 'block';
-        
-        try {
-            const prompt = `Give me a quick, fascinating 2-sentence travel tip, cultural fact, or scenic highlight about traveling between ${src} and ${dst} in Kerala, India. Keep it engaging and helpful for a bus traveler.`;
-            const insight = await callGeminiAPI(prompt, false);
-            
-            document.getElementById('aiInsightLoading').style.display = 'none';
-            document.getElementById('aiInsightContent').style.display = 'block';
-            document.getElementById('aiInsightContent').innerText = insight;
-        } catch(err) {
-            document.getElementById('aiInsightLoading').style.display = 'none';
-            document.getElementById('aiInsightContent').style.display = 'block';
-            document.getElementById('aiInsightContent').innerHTML = `<span class="text-danger">Unable to load AI insights at the moment. Enjoy your trip!</span>`;
-        }
-    };
-
 
     // --- FIREBASE CONFIG (UNTOUCHED) ---
     const firebaseConfig = {
@@ -611,7 +569,6 @@
                         <div class="mt-3 pt-2 d-flex justify-content-between align-items-center">
                             <div>
                                 <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Morning Express', 'BUS-M1', '08:10 AM')"><i class="fas fa-share-alt"></i> Share</button>
-                                <button class="btn btn-outline-info btn-sm fw-bold ms-1" onclick="window.fetchRouteInsight('${city}', '${college}')">✨ AI Insights</button>
                             </div>
                             <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="BUS-M1"><i class="fas fa-satellite-dish"></i> Track Live</button>
                         </div>
@@ -643,7 +600,6 @@
                         <div class="mt-3 pt-2 d-flex justify-content-between align-items-center">
                             <div>
                                 <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('Campus Evening Return', 'BUS-E1', '04:10 PM')"><i class="fas fa-share-alt"></i> Share</button>
-                                <button class="btn btn-outline-info btn-sm fw-bold ms-1" onclick="window.fetchRouteInsight('${college}', '${city}')">✨ AI Insights</button>
                             </div>
                             <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="BUS-E1"><i class="fas fa-satellite-dish"></i> Track Live</button>
                         </div>
@@ -762,7 +718,6 @@
                             <div class="mt-3 pt-2 d-flex justify-content-between align-items-center">
                                 <div>
                                     <button class="btn btn-outline-dark btn-sm" onclick="window.shareBus('${d.busName}', '${d.busNumber}', '${t1}')"><i class="fas fa-share-alt"></i> Share</button>
-                                    <button class="btn btn-outline-info btn-sm fw-bold ms-1" onclick="window.fetchRouteInsight('${t1Obj.name}', '${t2Obj.name}')">✨ AI Insights</button>
                                 </div>
                                 <button class="btn btn-success btn-sm fw-bold track-btn shadow-sm" data-bus="${d.busNumber}"><i class="fas fa-satellite-dish"></i> Track Live</button>
                             </div>
@@ -865,14 +820,16 @@
 
     // Helper: Approximate location based on lat/lng in Kerala
     function getApproximateLocation(lat, lng) {
-        if (lat > 10.75 && lat < 10.85 && lng > 76.15 && lng < 76.25) return "Kulappully / Shoranur Zone";
-        if (lat > 10.77 && lat < 10.80 && lng > 76.25 && lng < 76.30) return "Koonathra Area";
-        if (lat > 10.75 && lat < 10.80 && lng > 76.60 && lng < 76.70) return "Palakkad Town";
-        if (lat > 9.90 && lat < 10.10 && lng > 76.20 && lng < 76.40) return "Ernakulam / Kochi Zone";
-        if (lat > 8.40 && lat < 8.60 && lng > 76.80 && lng < 77.00) return "Thiruvananthapuram Zone";
-        if (lat > 11.20 && lat < 11.40 && lng > 75.70 && lng < 75.90) return "Kozhikode Zone";
-        if (lat > 11.80 && lat < 12.00 && lng > 75.30 && lng < 75.50) return "Kannur Zone";
-        return `GPS Point: ${lat.toFixed(3)}, ${lng.toFixed(3)}`;
+        let place = "On Route";
+        if (lat > 10.75 && lat < 10.85 && lng > 76.15 && lng < 76.25) place = "Kulappully / Shoranur Zone";
+        else if (lat > 10.77 && lat < 10.80 && lng > 76.25 && lng < 76.30) place = "Koonathra Area";
+        else if (lat > 10.75 && lat < 10.80 && lng > 76.60 && lng < 76.70) place = "Palakkad Town";
+        else if (lat > 9.90 && lat < 10.10 && lng > 76.20 && lng < 76.40) place = "Ernakulam / Kochi Zone";
+        else if (lat > 8.40 && lat < 8.60 && lng > 76.80 && lng < 77.00) place = "Thiruvananthapuram Zone";
+        else if (lat > 11.20 && lat < 11.40 && lng > 75.70 && lng < 75.90) place = "Kozhikode Zone";
+        else if (lat > 11.80 && lat < 12.00 && lng > 75.30 && lng < 75.50) place = "Kannur Zone";
+        
+        return `${place} [GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}]`;
     }
 
     // Dynamic Linear Tracking Method (Distance/Time Hybrid Logic)
