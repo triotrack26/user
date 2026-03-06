@@ -221,17 +221,6 @@
                     <button id="searchBtn" class="btn btn-dark btn-lg px-5 w-100 shadow"><i class="fas fa-search"></i> Search Route</button>
                 </div>
             </div>
-            
-            <!-- ✨ AI SMART SEARCH -->
-            <div class="mt-4 pt-3 border-top position-relative" id="aiSearchContainer">
-                <span class="position-absolute top-0 start-50 translate-middle px-2 text-muted small fw-bold" style="background-color: var(--card-light);" id="orBadge">OR</span>
-                <label class="form-label small fw-bold text-primary mt-2"><i class="fas fa-magic"></i> ✨ AI Smart Search</label>
-                <div class="input-group shadow-sm">
-                    <input type="text" id="aiSearchInput" class="form-control shadow-none border-primary" placeholder="E.g., Find me a KSRTC bus from Palakkad to Thrissur">
-                    <button id="aiSearchBtn" class="btn btn-primary fw-bold px-3">Ask ✨</button>
-                </div>
-                <small id="aiSearchStatus" class="form-text text-muted mt-1 d-block"></small>
-            </div>
 
             <datalist id="stopOptions"></datalist>
 
@@ -245,7 +234,7 @@
         <div id="map-container" class="mb-4">
             <div class="d-flex justify-content-between align-items-center p-3 bg-dark text-white">
                 <h5 class="fw-bold mb-0" id="map-title"><i class="fas fa-satellite-dish text-success pulse"></i> Live Tracking</h5>
-                <button id="closeMapBtn" class="btn btn-sm btn-danger"><i class="fas fa-times"></i> Close Map</button>
+                <button id="closeMapBtn" class="btn btn-sm btn-outline-light"><i class="fas fa-arrow-left"></i> Back to Results</button>
             </div>
             <!-- Dynamic Linear Tracker Status Box -->
             <div id="linear-status-box" class="bg-primary text-white p-2" style="font-size: 0.95rem; border-bottom: 2px solid #0056b3;">
@@ -272,85 +261,6 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, getDocs, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-    // --- GEMINI API CONFIGURATION ---
-    const apiKey = ""; // Execution environment provides the API key at runtime
-
-    // Exponential Backoff for Gemini Calls
-    async function callGeminiAPI(prompt, isJson = false) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-        const payload = {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7 }
-        };
-        
-        if (isJson) {
-            payload.generationConfig.responseMimeType = "application/json";
-            payload.generationConfig.responseSchema = {
-                type: "OBJECT",
-                properties: {
-                    source: {type: "STRING"},
-                    destination: {type: "STRING"},
-                    category: {type: "STRING"}
-                },
-                required: ["source", "destination"]
-            };
-        }
-
-        let retries = 5;
-        let delay = 1000;
-        for (let i = 0; i < retries; i++) {
-            try {
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const data = await response.json();
-                return data.candidates[0].content.parts[0].text;
-            } catch (e) {
-                if (i === retries - 1) throw e;
-                await new Promise(r => setTimeout(r, delay));
-                delay *= 2;
-            }
-        }
-    }
-
-    // ✨ AI Smart Search Handler
-    document.getElementById('aiSearchBtn').addEventListener('click', async () => {
-        const input = document.getElementById('aiSearchInput').value;
-        if (!input) return;
-        
-        const status = document.getElementById('aiSearchStatus');
-        status.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ✨ AI is analyzing your request...`;
-        
-        try {
-            const prompt = `Extract the starting city (source), destination city, and bus category from this travel request: "${input}". The category must be mapped to one of these EXACT strings: 'Private Bus', 'Public Bus (KSRTC)', 'Interstate', or 'All'. If you are unsure about the category, use 'All'.`;
-            
-            const resultText = await callGeminiAPI(prompt, true);
-            const json = JSON.parse(resultText);
-            
-            if (json.source) document.getElementById('source').value = json.source;
-            if (json.destination) document.getElementById('destination').value = json.destination;
-            
-            if (json.category && json.category !== 'All' && json.category !== 'Institution') {
-                window.selectCategory(json.category);
-            } else {
-                window.selectCategory('All');
-            }
-            
-            status.innerHTML = `<i class="fas fa-check text-success"></i> ✨ Got it! Searching for routes from ${json.source || 'Unknown'} to ${json.destination || 'Unknown'}...`;
-            
-            setTimeout(() => {
-                document.getElementById('searchBtn').click();
-                status.innerText = "";
-            }, 1000);
-            
-        } catch(err) {
-            status.innerHTML = `<i class="fas fa-exclamation-triangle text-danger"></i> ✨ AI failed to parse request. Please use manual search.`;
-        }
-    });
 
     // --- FIREBASE CONFIG (UNTOUCHED) ---
     const firebaseConfig = {
@@ -387,7 +297,6 @@
         document.body.classList.toggle('dark-mode');
         const isDark = document.body.classList.contains('dark-mode');
         document.getElementById('themeToggleBtn').innerHTML = isDark ? '<i class="fas fa-sun"></i> Light' : '<i class="fas fa-moon"></i> Dark';
-        document.getElementById('orBadge').style.backgroundColor = isDark ? 'var(--card-dark)' : 'var(--card-light)';
     });
 
     // SPA Navigation Hooks
@@ -417,14 +326,12 @@
         currentCategoryFilter = category;
         document.getElementById('selectedCategoryBadge').innerText = category;
         
-        // Toggle UI for Institution & AI Search
+        // Toggle UI for Institution
         if (category === 'Institution') {
             document.getElementById('standardFilters').style.display = 'none';
-            document.getElementById('aiSearchContainer').style.display = 'none';
             document.getElementById('institutionFilters').style.display = 'flex';
         } else {
             document.getElementById('standardFilters').style.display = 'flex';
-            document.getElementById('aiSearchContainer').style.display = 'block';
             document.getElementById('institutionFilters').style.display = 'none';
         }
         
@@ -820,7 +727,7 @@
 
     // Helper: Approximate location based on lat/lng in Kerala
     function getApproximateLocation(lat, lng) {
-        let place = "On Route";
+        let place = "Unknown Nearest Place";
         if (lat > 10.75 && lat < 10.85 && lng > 76.15 && lng < 76.25) place = "Kulappully / Shoranur Zone";
         else if (lat > 10.77 && lat < 10.80 && lng > 76.25 && lng < 76.30) place = "Koonathra Area";
         else if (lat > 10.75 && lat < 10.80 && lng > 76.60 && lng < 76.70) place = "Palakkad Town";
@@ -828,8 +735,9 @@
         else if (lat > 8.40 && lat < 8.60 && lng > 76.80 && lng < 77.00) place = "Thiruvananthapuram Zone";
         else if (lat > 11.20 && lat < 11.40 && lng > 75.70 && lng < 75.90) place = "Kozhikode Zone";
         else if (lat > 11.80 && lat < 12.00 && lng > 75.30 && lng < 75.50) place = "Kannur Zone";
+        else place = "On Route";
         
-        return `${place} [GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}]`;
+        return `Nearest Place: ${place} | GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     }
 
     // Dynamic Linear Tracking Method (Distance/Time Hybrid Logic)
@@ -881,6 +789,8 @@
     document.getElementById('closeMapBtn').addEventListener('click', () => {
         document.getElementById('map-container').style.display = 'none';
         if (unsubscribe) unsubscribe();
+        // Scroll back down to search results
+        document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
     });
 
 </script>
