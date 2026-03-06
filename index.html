@@ -240,7 +240,7 @@
             <div id="linear-status-box" class="bg-primary text-white p-2" style="font-size: 0.95rem; border-bottom: 2px solid #0056b3;">
                 <div class="d-flex flex-column align-items-center text-center">
                     <div class="fw-bold mb-1"><i class="fas fa-map-marker-alt text-warning"></i> Current Location: <br><span id="current-location-text" class="text-light">Detecting GPS Area...</span></div>
-                    <div class="fw-bold"><i class="fas fa-arrow-circle-right text-info"></i> Next Stop: <span id="next-stop-text" class="text-light">Calculating...</span></div>
+                    <div class="fw-bold"><i class="fas fa-arrow-circle-right text-info"></i> Next Stop: <span id="next-stop-text" class="text-light">Calculating exact coordinates...</span></div>
                 </div>
             </div>
             <div id="map"></div>
@@ -282,6 +282,9 @@
     let allRoutesData = []; 
     let currentCategoryFilter = "All";
     let historyStack = ['page-welcome'];
+
+    // Proximity Coordinate Cache
+    const stopCoordsCache = {};
 
     // --- UI LOGIC ---
     
@@ -520,7 +523,7 @@
         }, 600);
     });
 
-    // Share feature: Integrates directly with WhatsApp and System Sharing
+    // Share feature
     window.shareBus = async (busName, busNum, time) => {
         const shareData = {
             title: 'TrioTrack Live Route',
@@ -531,7 +534,6 @@
             if (navigator.share) {
                 await navigator.share(shareData);
             } else {
-                // Fallback directly to WhatsApp
                 const waUrl = `https://wa.me/?text=${encodeURIComponent(shareData.text + " Live Link: " + shareData.url)}`;
                 window.open(waUrl, '_blank');
             }
@@ -665,13 +667,23 @@
         } catch(e) { return "ETA"; }
     }
 
+    // Haversine Distance Calculator for Proximity (Returns km)
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Radius of earth
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
     // 3. Tracking Logic (Leaflet + Firebase)
     function track(busNum) {
         const mapDiv = document.getElementById('map-container');
         mapDiv.style.display = 'block';
         document.getElementById('map-title').innerHTML = `<i class="fas fa-satellite-dish text-success pulse"></i> Tracking: ${busNum}`;
         document.getElementById('current-location-text').innerText = "Connecting to GPS...";
-        document.getElementById('next-stop-text').innerText = "Calculating...";
+        document.getElementById('next-stop-text').innerText = "Calculating exact route coordinates...";
         mapDiv.scrollIntoView({ behavior: 'smooth' });
 
         if (!map) {
@@ -704,7 +716,23 @@
             iconAnchor: [15, 15]
         });
 
-        // Pulling ONLY the specific bus data, ensuring NO overlap with other buses on route
+        // 1. Fire off parallel asynchronous background fetching for Stop Coordinates 
+        const busData = allRoutesData.find(b => b.busNumber === busNum);
+        if (busData && busData.route) {
+            busData.route.forEach(stop => {
+                if (!stopCoordsCache[stop.name]) {
+                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(stop.name + ', Kerala, India')}&limit=1`)
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d && d.length > 0) {
+                            stopCoordsCache[stop.name] = { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+                        }
+                    }).catch(() => {});
+                }
+            });
+        }
+
+        // 2. Pull live coordinate snapshot
         unsubscribe = onSnapshot(doc(db, "locations", busNum), (docSnapshot) => {
             if (docSnapshot.exists()) {
                 const { lat, lng } = docSnapshot.data();
@@ -715,7 +743,7 @@
                 }
                 map.setView([lat, lng], 15);
                 
-                // Trigger advanced dynamic linear tracking using API
+                // Trigger advanced coordinate-based linear tracking 
                 updateLinearTracker(lat, lng, busNum);
             } else { 
                 alert("GPS Signal Lost: This bus is currently offline or not broadcasting its location.");
@@ -725,72 +753,65 @@
         });
     }
 
-    // Dynamic Linear Tracking Method using API Reverse Geocoding & Route Comparison
+    // Advanced Coordinate-Based Proximity Tracking & Live Reverse Geocoding
     function updateLinearTracker(lat, lng, busNum) {
         const currentLocText = document.getElementById('current-location-text');
         const nextStopText = document.getElementById('next-stop-text');
         const busData = allRoutesData.find(b => b.busNumber === busNum);
 
-        // Fetch real-time place name using OpenStreetMap Nominatim API
+        // 1. Fetch real-time place name using OpenStreetMap Nominatim API for exact Live position
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`)
             .then(res => res.json())
             .then(data => {
-                let placeName = data.name || data.address?.city || data.address?.town || data.address?.village || data.address?.suburb || "Unknown Place";
-                currentLocText.innerHTML = `${placeName} <br><small class="text-muted" style="font-size:0.75rem;">GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`;
-                
-                let nextStopName = "Calculating...";
-                
-                if (busData && busData.route && busData.route.length > 0) {
-                    // 1. Location-based matching: Check if current place matches any route stop
-                    let foundIndex = -1;
-                    let placeNameLower = placeName.toLowerCase();
-                    for (let i = 0; i < busData.route.length; i++) {
-                        if (placeNameLower.includes(busData.route[i].name.toLowerCase()) || busData.route[i].name.toLowerCase().includes(placeNameLower)) {
-                            foundIndex = i;
-                            break;
-                        }
-                    }
-                    
-                    if (foundIndex !== -1 && foundIndex < busData.route.length - 1) {
-                        nextStopName = `${busData.route[foundIndex + 1].name} (Based on current area)`;
-                    } else {
-                        // 2. Schedule Fallback logic if area doesn't exactly match a stop name
-                        const now = new Date();
-                        const currentMins = now.getHours() * 60 + now.getMinutes();
-                        
-                        for (let i = 0; i < busData.route.length; i++) {
-                            let stopTime = busData.route[i].time;
-                            if(stopTime && stopTime !== "N/A") {
-                                let isPM = stopTime.includes('PM');
-                                let timeParts = stopTime.replace(/(AM|PM)/i, '').trim().split(':');
-                                let hrs = parseInt(timeParts[0]);
-                                let mins = parseInt(timeParts[1]);
-                                if (isPM && hrs < 12) hrs += 12;
-                                if (!isPM && hrs === 12) hrs = 0;
-                                
-                                let stopMins = hrs * 60 + mins;
-                                
-                                if (currentMins < stopMins) {
-                                    nextStopName = `${busData.route[i].name} (ETA: ${stopTime})`;
-                                    break;
-                                }
-                            }
-                        }
-                        if (nextStopName === "Calculating...") nextStopName = `${busData.route[busData.route.length - 1].name} (Final Destination)`;
-                    }
-                } else {
-                    // Fallback for Institutional Mock Routes
-                    if(busNum === "BUS-M1") nextStopName = "College Campus (ETA: 08:50 AM)";
-                    else if(busNum === "BUS-E1") nextStopName = "District Headquarters (ETA: 04:50 PM)";
-                    else nextStopName = "Tracking active...";
-                }
-                
-                nextStopText.innerText = nextStopName;
+                let placeName = data.name || data.address?.city || data.address?.town || data.address?.village || data.address?.suburb || "Unnamed Highway/Road";
+                currentLocText.innerHTML = `${placeName} <br><small class="text-muted" style="font-size:0.75rem;">Exact GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`;
             })
             .catch(err => {
-                currentLocText.innerHTML = `Area Unavailable <br><small class="text-muted" style="font-size:0.75rem;">GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`;
-                nextStopText.innerText = "Location tracking...";
+                currentLocText.innerHTML = `Locating Satellite Data... <br><small class="text-muted" style="font-size:0.75rem;">Exact GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`;
             });
+            
+        // 2. Coordinate-Proximity Based Next Stop Logic
+        let nextStopName = "Calculating...";
+        if (busData && busData.route && busData.route.length > 0) {
+            let closestIndex = -1;
+            let minDistance = Infinity;
+
+            // Iterate all route stops to find geometrically closest stop using Haversine
+            for (let i = 0; i < busData.route.length; i++) {
+                const stop = busData.route[i];
+                if (stopCoordsCache[stop.name]) {
+                    const dist = getDistance(lat, lng, stopCoordsCache[stop.name].lat, stopCoordsCache[stop.name].lng);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestIndex = i;
+                    }
+                }
+            }
+
+            if (closestIndex !== -1) {
+                // If we are under 1.5 km to the closest stop, we are At/Arriving at it
+                if (minDistance < 1.5) {
+                    if (closestIndex < busData.route.length - 1) {
+                        const immediateNext = busData.route[closestIndex + 1];
+                        nextStopName = `Arriving at ${busData.route[closestIndex].name} ➔ Next: ${immediateNext.name}`;
+                    } else {
+                        nextStopName = `Arrived at Final Destination: ${busData.route[closestIndex].name}`;
+                    }
+                } else {
+                    // We are between stops, heading near the identified closest track coordinate
+                    nextStopName = `Heading towards ${busData.route[closestIndex].name} (${minDistance.toFixed(1)} km left)`;
+                }
+            } else {
+                nextStopName = `Acquiring route GPS coordinates...`;
+            }
+        } else {
+            // Fallback for Mock Institution Routes
+            if(busNum === "BUS-M1") nextStopName = "College Campus (ETA: 08:50 AM)";
+            else if(busNum === "BUS-E1") nextStopName = "District Headquarters (ETA: 04:50 PM)";
+            else nextStopName = "Tracking active...";
+        }
+        
+        nextStopText.innerText = nextStopName;
     }
 
     // Close Map
