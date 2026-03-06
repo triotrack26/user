@@ -234,12 +234,15 @@
         <div id="map-container" class="mb-4">
             <div class="d-flex justify-content-between align-items-center p-3 bg-dark text-white">
                 <h5 class="fw-bold mb-0" id="map-title"><i class="fas fa-satellite-dish text-success pulse"></i> Live Tracking</h5>
-                <button id="closeMapBtn" class="btn btn-sm btn-outline-light"><i class="fas fa-arrow-left"></i> Back to Results</button>
+                <div>
+                    <button id="refreshMapBtn" class="btn btn-sm btn-outline-info me-2"><i class="fas fa-sync-alt"></i> Refresh</button>
+                    <button id="closeMapBtn" class="btn btn-sm btn-outline-light"><i class="fas fa-arrow-left"></i> Back</button>
+                </div>
             </div>
             <!-- Dynamic Linear Tracker Status Box -->
             <div id="linear-status-box" class="bg-primary text-white p-2" style="font-size: 0.95rem; border-bottom: 2px solid #0056b3;">
                 <div class="d-flex flex-column align-items-center text-center">
-                    <div class="fw-bold mb-1"><i class="fas fa-map-marker-alt text-warning"></i> Current Location: <br><span id="current-location-text" class="text-light">Detecting GPS Area...</span></div>
+                    <div class="fw-bold mb-1"><i class="fas fa-map-marker-alt text-warning"></i> Current Location: <br><span id="current-location-text" class="text-light">Detecting GPS Coordinates...</span></div>
                     <div class="fw-bold"><i class="fas fa-arrow-circle-right text-info"></i> Next Stop: <span id="next-stop-text" class="text-light">Calculating exact coordinates...</span></div>
                 </div>
             </div>
@@ -759,24 +762,15 @@
         const nextStopText = document.getElementById('next-stop-text');
         const busData = allRoutesData.find(b => b.busNumber === busNum);
 
-        // 1. Fetch real-time place name using OpenStreetMap Nominatim API for exact Live position
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14`)
-            .then(res => res.json())
-            .then(data => {
-                let placeName = data.name || data.address?.city || data.address?.town || data.address?.village || data.address?.suburb || "Unnamed Highway/Road";
-                currentLocText.innerHTML = `${placeName} <br><small class="text-muted" style="font-size:0.75rem;">Exact GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`;
-            })
-            .catch(err => {
-                currentLocText.innerHTML = `Locating Satellite Data... <br><small class="text-muted" style="font-size:0.75rem;">Exact GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}</small>`;
-            });
+        // 1. Current Location: ONLY GPS Coordinates (Latitude & Longitude)
+        currentLocText.innerHTML = `Latitude: ${lat.toFixed(5)} <br> Longitude: ${lng.toFixed(5)}`;
             
-        // 2. Coordinate-Proximity Based Next Stop Logic
+        // 2. Coordinate-Proximity Based Next Stop Logic (Place Name ONLY)
         let nextStopName = "Calculating...";
         if (busData && busData.route && busData.route.length > 0) {
             let closestIndex = -1;
             let minDistance = Infinity;
 
-            // Iterate all route stops to find geometrically closest stop using Haversine
             for (let i = 0; i < busData.route.length; i++) {
                 const stop = busData.route[i];
                 if (stopCoordsCache[stop.name]) {
@@ -789,30 +783,36 @@
             }
 
             if (closestIndex !== -1) {
-                // If we are under 1.5 km to the closest stop, we are At/Arriving at it
                 if (minDistance < 1.5) {
                     if (closestIndex < busData.route.length - 1) {
-                        const immediateNext = busData.route[closestIndex + 1];
-                        nextStopName = `Arriving at ${busData.route[closestIndex].name} ➔ Next: ${immediateNext.name}`;
+                        nextStopName = busData.route[closestIndex + 1].name;
                     } else {
-                        nextStopName = `Arrived at Final Destination: ${busData.route[closestIndex].name}`;
+                        nextStopName = busData.route[closestIndex].name;
                     }
                 } else {
-                    // We are between stops, heading near the identified closest track coordinate
-                    nextStopName = `Heading towards ${busData.route[closestIndex].name} (${minDistance.toFixed(1)} km left)`;
+                    nextStopName = busData.route[closestIndex].name;
                 }
             } else {
-                nextStopName = `Acquiring route GPS coordinates...`;
+                nextStopName = `Location processing...`;
             }
         } else {
-            // Fallback for Mock Institution Routes
-            if(busNum === "BUS-M1") nextStopName = "College Campus (ETA: 08:50 AM)";
-            else if(busNum === "BUS-E1") nextStopName = "District Headquarters (ETA: 04:50 PM)";
-            else nextStopName = "Tracking active...";
+            if(busNum === "BUS-M1") nextStopName = "College Campus";
+            else if(busNum === "BUS-E1") nextStopName = "District Headquarters";
+            else nextStopName = "Active";
         }
         
         nextStopText.innerText = nextStopName;
     }
+
+    // Refresh Map
+    document.getElementById('refreshMapBtn').addEventListener('click', () => {
+        if (map) {
+            map.invalidateSize();
+            if (marker) {
+                map.setView(marker.getLatLng(), 15);
+            }
+        }
+    });
 
     // Close Map
     document.getElementById('closeMapBtn').addEventListener('click', () => {
